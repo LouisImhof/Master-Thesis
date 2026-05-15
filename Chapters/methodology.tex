@@ -1,6 +1,590 @@
+% ============================================================
+% methodology_draft.tex
+% Copy this content into your thesis repo: Chapters/methodology.tex
+% Also append new_bib_entries.bib to references.bib
+%
+% Add to main.tex preamble (if not already present):
+%   \usepackage{amsmath}
+%   \usepackage{amssymb}
+%   \usepackage{booktabs}
+%   \usepackage{multirow}
+% ============================================================
+
 \newpage
 \section{Methodology}
 
+This chapter presents the full empirical framework of the thesis. Section~\ref{sec:data} describes the data universe, sample construction, and label definition. Section~\ref{sec:split} formalises the walk-forward validation design. Sections~\ref{sec:images} and~\ref{sec:features} detail the two image encoding schemes and the technical feature set. Section~\ref{sec:architectures} specifies the three neural network architectures. Section~\ref{sec:training} describes the unified training protocol. Section~\ref{sec:evaluation} defines the full evaluation framework spanning classification metrics, statistical hypothesis tests, and trading strategy performance.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Data Collection and Sample Construction}
+\label{sec:data}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsubsection{Universe Selection}
+
+The empirical analysis covers the 50 constituents of the \textbf{Euro Stoxx 50} index, Europe's premier blue-chip equity benchmark representing the largest and most liquid publicly listed companies across 12 Eurozone member states. Constituent stocks are drawn from major European exchanges, including Euronext Amsterdam (\texttt{.AS}), Euronext Paris (\texttt{.PA}), Deutsche Börse Xetra (\texttt{.DE}), Bolsa de Madrid (\texttt{.MC}), Borsa Italiana (\texttt{.MI}), and Euronext Brussels (\texttt{.BR}). The choice of universe is motivated by three considerations. First, the strict free-float and liquidity requirements governing index membership substantially reduce microstructure noise that could contaminate chart-based signal extraction. Second, with stocks spanning technology, financials, energy, healthcare, and industrials, the Euro Stoxx 50 provides sufficient cross-sectional variation to support meaningful statistical inference. Third, as detailed in the literature review, the chart-pattern CNN literature is overwhelmingly concentrated on U.S. equities \parencite{Jiang2023}; applying these methods to a major European index directly addresses the identified geographic gap and contributes to the growing evidence on the cross-market generalisability of machine learning return predictors \parencite{cakici2023}.
+
+Daily adjusted Open, High, Low, Close, and Volume (OHLCV) data are sourced from Yahoo Finance via the \texttt{yfinance} Python library, spanning 1 January 2000 through 31 December 2025. All price series are adjusted for dividends and corporate actions using Yahoo's auto-adjustment routine, ensuring that price returns accurately reflect total returns net of distributions. The resulting raw dataset spans 26 years across markedly different economic regimes: the dot-com collapse (2000--2002), the credit expansion and Global Financial Crisis (2003--2009), the European Sovereign Debt Crisis (2010--2012), the post-crisis low-rate bull market (2013--2019), the COVID-19 market shock and V-shaped recovery (2020), and the post-pandemic regime of elevated inflation and the sharpest interest rate hiking cycle since the 1980s (2021--2023). This diversity of regimes is an asset for evaluating out-of-sample robustness: a model that performs consistently across multiple distinct macro environments provides stronger evidence of genuine predictive content than one evaluated on a single homogeneous period.
+
+\subsubsection{Label Construction and Prediction Horizon}
+
+Each observation in the dataset pairs a 20-trading-day look-back window with a 20-trading-day forward prediction horizon, following the I20R20 specification of \textcite{Jiang2023}. The binary directional label is defined as:
+
+\begin{equation}
+y_{i,t} = \mathbb{1}\!\left[\frac{P_{i,t+H}}{P_{i,t}} - 1 > 0\right], \qquad H = 20
+\label{eq:label}
+\end{equation}
+
+\noindent where $P_{i,t}$ is the adjusted closing price of stock $i$ at trading day $t$, and $H = 20$ is the prediction horizon in trading days, corresponding approximately to one calendar month. The label $y_{i,t} = 1$ indicates that the stock appreciates over the subsequent 20 trading days and $y_{i,t} = 0$ indicates a decline. This specification is economically meaningful, targeting a practically tradeable horizon at which transaction costs are manageable, while remaining consistent with the primary benchmark paper.
+
+The application of the I20R20 specification to the 50-stock Euro Stoxx 50 universe yields a total of \textbf{315,903 stock-day observations}. The unconditional positive class frequency is 55.1\%, reflecting the historical upward drift of European equities over the full sample period. This mild class imbalance is addressed in model design through loss functions that weight minority class errors more heavily, as described in Section~\ref{sec:architectures}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Walk-Forward Validation Framework}
+\label{sec:split}
+% ─────────────────────────────────────────────────────────────────────────────
+
+A critical methodological concern in financial machine learning is temporal data leakage. Standard $k$-fold cross-validation and random train-test splits are inappropriate for time-series data because they permit training observations that post-date test observations, implicitly conditioning on future information and producing spuriously optimistic performance estimates \parencite{Gu2020}. This thesis adopts a \textbf{strict walk-forward split} that replicates the information constraints of genuine out-of-sample forecasting.
+
+The full sample is partitioned into three non-overlapping, chronologically ordered subsets:
+
+\begin{align}
+\mathcal{D}_{train} &= \{(x_{i,t},\, y_{i,t}) \mid t \leq T_{train}\}, \quad &&T_{train} = \text{31 December 2018} \label{eq:train}\\
+\mathcal{D}_{val}   &= \{(x_{i,t},\, y_{i,t}) \mid T_{train} < t \leq T_{val}\}, \quad &&T_{val} = \text{31 December 2020} \label{eq:val}\\
+\mathcal{D}_{test}  &= \{(x_{i,t},\, y_{i,t}) \mid t > T_{val}\} \label{eq:test}
+\end{align}
+
+\noindent Table~\ref{tab:split} reports the resulting sample sizes.
+
+\begin{table}[H]
+\centering
+\caption{Walk-Forward Dataset Split}
+\label{tab:split}
+\begin{tabular}{lccr}
+\toprule
+\textbf{Partition} & \textbf{Period} & \textbf{Observations} & \textbf{Share} \\
+\midrule
+Training set    & 2005--2018 & 223,749 & 70.8\% \\
+Validation set  & 2019--2020 &  25,222 &  8.0\% \\
+OOS test set    & 2021--2026 &  66,932 & 21.2\% \\
+\midrule
+Total           & 2005--2026 & 315,903 & 100\%  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The training set covers the period 2005--2018, providing exposure to two complete market cycles including the Global Financial Crisis. The validation set spans 2019--2020, encompassing the final year of the pre-pandemic expansion and the COVID-19 market shock. The validation set serves exclusively for early stopping and model checkpoint selection: the checkpoint with the highest validation AUC is retained. Crucially, the \textbf{out-of-sample test set (2021--2026)} is evaluated exactly once per model, using the retained checkpoint, and no model design decisions are made on the basis of OOS performance. This strict protocol ensures that reported OOS metrics constitute genuine forward-looking forecasts and are not contaminated by any form of test-set leakage or implicit multiple testing.
+
+It bears noting that the validation period coincides with the COVID-19 market shock of 2020, which produced extraordinary volatility and a historically rapid bear-to-bull reversal. This may introduce a degree of selection bias toward models that perform well in high-volatility regimes, which represents a limitation of the current design. The OOS test period, by contrast, covers the 2022 bear market driven by monetary policy tightening, the 2023--2024 recovery, and early 2025, encompassing a range of market conditions that constitute a demanding out-of-sample evaluation.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Chart Image Representations}
+\label{sec:images}
+% ─────────────────────────────────────────────────────────────────────────────
+
+A defining feature of this thesis is the use of two distinct image encoding schemes: a faithful replication of the greyscale OHLC chart of \textcite{Jiang2023}, used for the baseline model, and a novel multi-scale RGB representation, used for the two advanced models.
+
+\subsubsection{Baseline Greyscale OHLC Image}
+
+Following \textcite{Jiang2023} precisely, each 20-day look-back window is rendered as a $60 \times 64$ pixel greyscale image. The image encodes five time series simultaneously: Open, High, Low, Close, and Volume, as well as a 20-day moving average overlay. The construction proceeds in three steps.
+
+\paragraph{Step 1: Price Normalisation.}
+All price series are expressed as returns relative to the first closing price in the 20-day window, eliminating the absolute level of prices and ensuring that images are scale-invariant across stocks, price levels, and time periods:
+
+\begin{equation}
+\tilde{r}_{d}^{k} = \frac{P_{t_0 + d}^{k}}{P_{t_0}^{Close}} - 1, \qquad k \in \{\text{Open, High, Low, Close}\}, \quad d = 0, 1, \ldots, 19
+\label{eq:price_norm}
+\end{equation}
+
+\noindent where $t_0$ is the first trading day of the window. The normalised return $\tilde{r}_d^k$ expresses each price as a percentage gain or loss relative to the starting close.
+
+\paragraph{Step 2: Pixel Row Mapping.}
+The image height is divided into a price panel occupying the upper 80\% ($H_p = 51$ rows) and a volume panel occupying the lower 20\% ($H_v = 13$ rows). The vertical pixel row corresponding to a normalised return $r$ within the price panel is determined by:
+
+\begin{equation}
+\text{py}(r) = \text{clip}\!\left(\left\lfloor\frac{r - r_{min}}{r_{max} - r_{min}} \cdot (H_p - 1)\right\rfloor,\; 0,\; H_p - 1\right)
+\label{eq:pixmap}
+\end{equation}
+
+\noindent where $r_{min}$ and $r_{max}$ are the minimum and maximum of the combined High and Low return series over all 20 days. This mapping guarantees that the full price range is always visible within the price panel, regardless of the magnitude of price movements.
+
+\paragraph{Step 3: OHLC and Volume Rendering.}
+Each trading day $d \in \{0, \ldots, 19\}$ occupies three pixel columns: $x = 3d$, $3d+1$, and $3d+2$. The centre column ($3d+1$) renders the high-low shadow by setting all pixels between rows $\text{py}(\tilde{r}_d^{High})$ and $\text{py}(\tilde{r}_d^{Low})$ to full brightness (value 255). The left column ($3d$) marks the open price with a single pixel at brightness 255, and the right column ($3d+2$) marks the close. The 20-day simple moving average is overlaid on the centre column at reduced brightness (200):
+
+\begin{equation}
+\text{MA}_d = \frac{1}{\min(d+1, 20)} \sum_{j=0}^{d} \tilde{r}_j^{Close}
+\label{eq:ma}
+\end{equation}
+
+Volume is rendered as a bar of height proportional to the normalised volume in the lower panel:
+
+\begin{equation}
+h_d^{vol} = \left\lfloor\frac{V_d}{\max_{j=0}^{19} V_j} \cdot (H_v - 1)\right\rfloor
+\label{eq:vol_bar}
+\end{equation}
+
+\noindent at brightness 180 in the centre column. The resulting 60×64 greyscale image provides a compact, scale-invariant visual encoding of 20 trading days requiring 3,840 bytes per observation.
+
+\subsubsection{Multi-Scale RGB Image Representation}
+
+The baseline image encodes a single 20-day temporal horizon. Financial price dynamics, however, are inherently multi-scale: a short-term reversal may be embedded within an intermediate-term trend, which in turn is governed by a longer-term regime. Encoding only one scale discards potentially predictive information available at adjacent horizons.
+
+To address this, this thesis introduces a \textbf{three-channel RGB image} in which each colour channel independently encodes OHLC candlestick information at a different temporal horizon. Formally, let $\mathcal{C}^{(s)}$ denote an OHLC channel image rendered from the $s$-day window ending at day $t$, using the same pixel-mapping procedure described in Equations~\eqref{eq:price_norm}--\eqref{eq:vol_bar}. Three scales are assigned to the RGB channels as:
+
+\begin{equation}
+\mathbf{I}_t = \left[\,\mathcal{C}^{(5)},\; \mathcal{C}^{(20)},\; \mathcal{C}^{(60)}\,\right] \in [0,255]^{224 \times 224 \times 3}
+\label{eq:rgb_image}
+\end{equation}
+
+\noindent where $s = 5$ (Red channel) corresponds to one trading week, $s = 20$ (Green channel) to one trading month, and $s = 60$ (Blue channel) to one trading quarter. Each channel is independently normalised to the price range of its own window before being up-sampled to $224 \times 224$ pixels via Lanczos interpolation to match the input resolution required by the ImageNet-pretrained backbone models.
+
+An important clarification concerns the visual appearance of this representation. The superposition of three temporally distinct OHLC charts into a single RGB display produces an image that appears highly colourful and visually complex to a human observer. This is not a limitation. Convolutional neural networks process each channel independently via separate filter weights in the first convolutional layer; the ``colour noise'' perceived by a human is an artefact of the RGB rendering pipeline and is irrelevant to the model's computation. The three channels provide three parallel spatial information streams from which the CNN learns independent multi-scale features before combining them in deeper layers.
+
+\paragraph{Prevention of Data Leakage.}
+A common error in the financial deep learning literature is to fit normalisation parameters (e.g., MinMax or StandardScaler) on the full price history of a stock and then apply them globally to all windows. This constitutes a form of future data leakage, because the scaling parameters depend on prices that post-date the observation. In this thesis, all normalisation is performed \textit{strictly within each look-back window}, as defined in Equations~\eqref{eq:price_norm}--\eqref{eq:pixmap}, ensuring that no information from outside the window contaminates the image at any step.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Technical Feature Engineering}
+\label{sec:features}
+% ─────────────────────────────────────────────────────────────────────────────
+
+In addition to the visual image input, the two advanced models incorporate a sequence of 25 hand-crafted technical indicators computed over the 20-day look-back window. Technical indicators compress the momentum, trend, mean-reversion, and volume dynamics of a price series into a structured numerical form, providing the sequence branch of the hybrid architecture with complementary information to that encoded in the chart image. The full feature set is reported in Table~\ref{tab:features}.
+
+\begin{table}[H]
+\centering
+\caption{Technical Indicator Feature Set}
+\label{tab:features}
+\begin{tabular}{llp{6.5cm}}
+\toprule
+\textbf{Feature(s)} & \textbf{Category} & \textbf{Description} \\
+\midrule
+Return\_1d, \_5d, \_10d, \_20d & Momentum & Log-return over 1, 5, 10, and 20 trading days \\
+Vol\_20d   & Volatility   & Rolling 20-day standard deviation of daily log-returns \\
+High\_20d, Low\_20d & Price Range & 20-day high and low, normalised by current close \\
+RSI\_14    & Momentum     & Relative Strength Index over 14 days \parencite{lo2000} \\
+MACD, Signal, MACD\_Hist & Trend & MACD(12,26,9): difference of EMAs, signal line, histogram \\
+BB\_Upper, BB\_Lower, BB\_Pct & Volatility & Bollinger Bands (20-day, $\pm2\sigma$) and price percentile within bands \\
+ATR\_14    & Volatility   & Average True Range over 14 days \\
+OBV        & Volume       & On-Balance Volume: cumulative signed volume \\
+VWAP\_Ratio & Price/Volume & Ratio of current close to 20-day Volume-Weighted Average Price \\
+EMA\_5, EMA\_20 & Trend    & 5-day and 20-day Exponential Moving Averages, normalised \\
+ADX\_14    & Trend Strength & Average Directional Index over 14 days \\
+Stoch\_K, Stoch\_D & Momentum & Stochastic Oscillator (14, 3, 3): fast and slow lines \\
+CCI\_14    & Mean-Reversion & Commodity Channel Index over 14 days \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Per-Window Z-Score Normalisation.}
+To ensure stationarity and prevent data leakage, each of the 25 feature series is normalised within its 20-day look-back window using z-score standardisation. For feature $j$ at position $i$ within window $w$ of length $W = 20$:
+
+\begin{equation}
+\hat{x}_{i,j}^{(w)} = \frac{x_{i,j}^{(w)} - \mu_j^{(w)}}{\sigma_j^{(w)} + \varepsilon}
+\label{eq:zscore}
+\end{equation}
+
+\noindent where:
+
+\begin{align}
+\mu_j^{(w)} &= \frac{1}{W} \sum_{i=1}^{W} x_{i,j}^{(w)} \label{eq:mean}\\
+\sigma_j^{(w)} &= \sqrt{\frac{1}{W} \sum_{i=1}^{W} \left(x_{i,j}^{(w)} - \mu_j^{(w)}\right)^2} \label{eq:std}
+\end{align}
+
+\noindent and $\varepsilon = 10^{-8}$ is a small constant for numerical stability. Non-finite values arising from undefined indicators at the beginning of a stock's price history are replaced with zero. Each observation is thus represented as a $20 \times 25$ normalised feature matrix, with rows corresponding to trading days and columns to indicators. The per-window design ensures that the sequence encoder receives stationary, comparably scaled inputs at all times, which is particularly important for attention-based architectures whose softmax outputs are sensitive to the magnitude of input values \parencite{vaswani2017}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Model Architectures}
+\label{sec:architectures}
+% ─────────────────────────────────────────────────────────────────────────────
+
+Three neural network architectures are evaluated. All share the same data universe, temporal split, prediction horizon, and evaluation protocol, enabling direct performance comparison. The architectures progress in complexity: the baseline model provides a direct replication of the existing literature; the two advanced models introduce pretrained backbones, hybrid dual-branch designs, and modern loss functions.
+
+\subsubsection{Model I: Baseline CNN — Replication of Jiang et al.\ (2023)}
+\label{sec:model1}
+
+The first model is an exact replication of the three-block VGG-style convolutional neural network of \textcite{Jiang2023}, applied to their I20R20 image specification. The architecture is intentionally minimal to establish a transparent benchmark grounded in published methodology.
+
+\paragraph{Architecture.}
+The model consists of three convolutional blocks applied sequentially to the $60 \times 64$ greyscale input image. Each block applies a 2D convolution, batch normalisation, a leaky ReLU activation, and height-only max-pooling. The design choices reflect the image geometry: with three pixels per trading day across 20 days in the horizontal axis and price encoded vertically, kernels of size $(5 \times 3)$ capture approximately one trading week of vertical price dynamics across three adjacent days.
+
+Block 1 uses a stride of 3 and a dilation of 2 in the height dimension, enabling the first layer to efficiently compress the price axis while retaining full resolution along the width (time) axis. The output height of a convolutional layer is given by:
+
+\begin{equation}
+H_{out} = \left\lfloor \frac{H_{in} + 2p - d(k-1) - 1}{s} + 1 \right\rfloor
+\label{eq:conv_out}
+\end{equation}
+
+\noindent where $p$ is padding, $d$ is dilation, $k$ is kernel size, and $s$ is stride. For Block 1, the height parameters are $k = 5$, $s = 3$, $d = 2$, $p = 7$; width parameters are $k = 3$, $s = 1$, $d = 1$, $p = 1$. Blocks 2 and 3 use standard convolution ($s=1$, $d=1$) with $(5 \times 3)$ kernels and symmetric padding. After each activation, max-pooling with a $(2 \times 1)$ kernel halves the height while preserving width. The channel progression is $1 \to 64 \to 128 \to 256$, doubling at each block.
+
+\begin{table}[H]
+\centering
+\caption{Baseline CNN Architecture Specification}
+\label{tab:baseline_arch}
+\begin{tabular}{llllr}
+\toprule
+\textbf{Block} & \textbf{Layer} & \textbf{Kernel} & \textbf{Stride / Dilation} & \textbf{Channels} \\
+\midrule
+\multirow{3}{*}{1} & Conv2d     & $(5,3)$ & $(3,1)$ / $(2,1)$ & 64  \\
+                   & BN + LReLU(0.01) & --  & --                & 64  \\
+                   & MaxPool2d  & $(2,1)$ & --                & 64  \\
+\midrule
+\multirow{3}{*}{2} & Conv2d     & $(5,3)$ & $(1,1)$ / $(1,1)$ & 128 \\
+                   & BN + LReLU(0.01) & --  & --                & 128 \\
+                   & MaxPool2d  & $(2,1)$ & --                & 128 \\
+\midrule
+\multirow{3}{*}{3} & Conv2d     & $(5,3)$ & $(1,1)$ / $(1,1)$ & 256 \\
+                   & BN + LReLU(0.01) & --  & --                & 256 \\
+                   & MaxPool2d  & $(2,1)$ & --                & 256 \\
+\midrule
+Classifier         & Flatten $\to$ Dropout(0.5) $\to$ Linear & -- & -- & 2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Batch Normalisation.}
+Following each convolution, batch normalisation \parencite{ioffe2015} standardises activations across the mini-batch dimension:
+
+\begin{equation}
+\hat{x}_i = \frac{x_i - \mu_{\mathcal{B}}}{\sqrt{\sigma^2_{\mathcal{B}} + \varepsilon}}, \qquad y_i = \gamma \hat{x}_i + \beta
+\label{eq:batchnorm}
+\end{equation}
+
+\noindent where $\mu_{\mathcal{B}}$ and $\sigma^2_{\mathcal{B}}$ are the batch mean and variance, and $\gamma$, $\beta$ are learnable affine parameters. Batch normalisation reduces internal covariate shift, accelerates convergence, and provides mild regularisation.
+
+\paragraph{Activation Function.}
+The Leaky Rectified Linear Unit \parencite{ioffe2015} with negative slope $\alpha = 0.01$ is used throughout:
+
+\begin{equation}
+\text{LReLU}(x;\, \alpha) = \begin{cases} x & \text{if } x > 0 \\ \alpha x & \text{otherwise} \end{cases}
+\label{eq:lrelu}
+\end{equation}
+
+\noindent The non-zero negative slope prevents neurons from becoming permanently inactive (the ``dying ReLU'' problem), which is important in financial data where predictive signal may reside in negative activation directions.
+
+\paragraph{Initialisation.}
+All convolutional and linear weights are initialised using Xavier uniform initialisation \parencite{glorot2010}:
+
+\begin{equation}
+W \sim \mathcal{U}\!\left(-\sqrt{\frac{6}{n_{in} + n_{out}}},\; \sqrt{\frac{6}{n_{in} + n_{out}}}\right)
+\label{eq:xavier}
+\end{equation}
+
+\noindent where $n_{in}$ and $n_{out}$ are the fan-in and fan-out of the weight tensor. This initialisation maintains the expected variance of activations and gradients across layers, facilitating stable early-phase learning.
+
+\paragraph{Loss Function.}
+The model is trained with standard cross-entropy loss:
+
+\begin{equation}
+\mathcal{L}_{CE} = -\frac{1}{N} \sum_{i=1}^{N} \left[ y_i \log \hat{p}_i + (1 - y_i) \log(1 - \hat{p}_i) \right]
+\label{eq:ce_loss}
+\end{equation}
+
+\noindent where $\hat{p}_i = \sigma(\mathbf{f}_i)$ is the predicted up-probability obtained by applying the softmax to the model's two output logits.
+
+\paragraph{Ensemble.}
+To reduce variance arising from random weight initialisation, the model is trained independently for $N_{runs} = 5$ runs. The final ensemble prediction is the arithmetic mean of the softmax probabilities across all runs, following the protocol of \textcite{Jiang2023}.
+
+\subsubsection{Model II: EfficientNet-B2 with Transformer Sequence Encoder}
+\label{sec:model2}
+
+The second model is a \textbf{hybrid dual-branch architecture} that processes the multi-scale RGB image through a pretrained convolutional backbone and the 25-dimensional technical indicator sequence through a Transformer encoder, before fusing both representations for classification. This design reflects the hypothesis that visual chart patterns and numerical momentum signals carry complementary predictive information.
+
+\paragraph{Visual Branch: EfficientNet-B2.}
+The image branch employs EfficientNet-B2 \parencite{tan2019} as the convolutional backbone. EfficientNet achieves state-of-the-art accuracy-efficiency trade-offs via compound scaling, a principled joint scaling of network depth ($d$), width ($w$), and input resolution ($r$):
+
+\begin{equation}
+d = \alpha^\phi, \quad w = \beta^\phi, \quad r = \gamma^\phi, \qquad \text{subject to}\quad \alpha \cdot \beta^2 \cdot \gamma^2 \approx 2,\; \phi \geq 1
+\label{eq:eff_scaling}
+\end{equation}
+
+\noindent where $\alpha$, $\beta$, $\gamma$ are architecture-specific constants and $\phi$ is the compound coefficient. EfficientNet-B2 ($\phi = 2$) comprises approximately 9.1 million parameters and achieves competitive ImageNet accuracy at substantially lower computational cost than traditional architectures such as ResNet-50. The backbone is initialised with ImageNet-1k pretrained weights and fine-tuned end-to-end during training at a reduced learning rate to preserve general visual feature representations while adapting to the financial chart domain. The output of the backbone after global average pooling is a feature vector $\mathbf{z}^{img} \in \mathbb{R}^{d_{img}}$.
+
+\paragraph{Sequence Branch: Transformer Encoder.}
+The sequence branch processes the $20 \times 25$ per-window z-score normalised technical feature matrix through a standard Transformer encoder \parencite{vaswani2017}. The core computational primitive is scaled dot-product attention:
+
+\begin{equation}
+\text{Attention}(Q, K, V) = \text{softmax}\!\left(\frac{QK^\top}{\sqrt{d_k}}\right) V
+\label{eq:attention}
+\end{equation}
+
+\noindent where $Q \in \mathbb{R}^{n \times d_k}$, $K \in \mathbb{R}^{n \times d_k}$, $V \in \mathbb{R}^{n \times d_v}$ are query, key, and value matrices produced by learned linear projections of the input sequence, $n$ is the sequence length (20 time steps), and $d_k$ is the key dimensionality. Multi-head attention applies $h$ parallel attention heads and concatenates their outputs:
+
+\begin{equation}
+\text{MHA}(Q,K,V) = \text{Concat}(\text{head}_1, \ldots, \text{head}_h) W^O, \quad \text{head}_i = \text{Attention}(QW_i^Q,\, KW_i^K,\, VW_i^V)
+\label{eq:mha}
+\end{equation}
+
+The encoder uses pre-layer normalisation (Pre-LN) placement for improved training stability. A prepended \texttt{[CLS]} token aggregates sequence-level information; its representation at the encoder output serves as the sequence summary $\mathbf{z}^{seq} \in \mathbb{R}^{d_{seq}}$.
+
+\paragraph{Fusion and Classification.}
+The image and sequence representations are concatenated along the feature dimension and projected to two output logits by a linear classifier:
+
+\begin{equation}
+\hat{\mathbf{y}} = W_c \!\left[\mathbf{z}^{img} \;\Vert\; \mathbf{z}^{seq}\right] + \mathbf{b}_c
+\label{eq:fusion}
+\end{equation}
+
+\paragraph{Data Augmentation.}
+Two regularisation strategies are applied during training. \textbf{CutMix} \parencite{yun2019} creates augmented samples by replacing a randomly located rectangular patch of one image with the corresponding patch from another, generating a blended label proportional to the replaced area:
+
+\begin{align}
+\tilde{x} &= M \odot x_A + (1 - M) \odot x_B \label{eq:cutmix_x}\\
+\tilde{y} &= \lambda y_A + (1 - \lambda) y_B, \qquad \lambda = \frac{|M|}{H \cdot W} \label{eq:cutmix_y}
+\end{align}
+
+\noindent where $M \in \{0,1\}^{H \times W}$ is the binary cut mask and $|M|$ is the number of ones. \textbf{Mixup} \parencite{zhang2018mixup} linearly interpolates between two training samples:
+
+\begin{equation}
+\tilde{x} = \lambda x_A + (1-\lambda)x_B, \quad \tilde{y} = \lambda y_A + (1-\lambda)y_B, \qquad \lambda \sim \mathrm{Beta}(\alpha, \alpha)
+\label{eq:mixup}
+\end{equation}
+
+Both augmentations act as implicit label-smoothing regularisers, penalising overconfident predictions and encouraging the model to learn spatially distributed, overlapping representations of chart patterns rather than memorising isolated image fragments.
+
+\paragraph{Loss Function: Focal Loss.}
+Standard cross-entropy assigns equal weight to all training samples regardless of their classification difficulty. Focal Loss \parencite{lin2017} addresses this by introducing a modulating factor that down-weights the loss contribution of easy, correctly classified examples, focusing gradient signal on hard, informative cases:
+
+\begin{equation}
+\mathcal{L}_{FL}(p_t) = -\alpha_t (1 - p_t)^\gamma \log(p_t)
+\label{eq:focal}
+\end{equation}
+
+\noindent where $p_t$ is the predicted probability of the true class, $\gamma = 2$ is the focusing parameter, and $\alpha_t$ is a class-balancing weight. As $p_t \to 1$ (the sample is classified correctly with high confidence), $(1-p_t)^\gamma \to 0$, effectively zeroing out the loss for well-classified examples and concentrating training on the difficult boundary cases that carry the most discriminative information.
+
+\paragraph{Optimisation.}
+Two parameter groups are defined with separate learning rates: the pretrained EfficientNet backbone ($\eta_{backbone} = 3 \times 10^{-5}$) and all remaining parameters (Transformer encoder, projection heads, classifier: $\eta_{head} = 3 \times 10^{-4}$). The order-of-magnitude differential is standard practice in transfer learning and prevents the pretrained visual representations from being overwritten during fine-tuning on the smaller financial dataset.
+
+\subsubsection{Model III: ConvNeXt V2-Tiny with iTransformer Sequence Encoder}
+\label{sec:model3}
+
+The third model represents the current frontier of both vision and time-series deep learning, combining \textbf{ConvNeXt V2-Tiny} \parencite{woo2023} as the visual backbone, the \textbf{iTransformer} \parencite{liu2024itransformer} as the sequence encoder, and the \textbf{Asymmetric Focal Loss} \parencite{ridnik2021} as the training objective.
+
+\paragraph{Visual Branch: ConvNeXt V2.}
+ConvNeXt V2 \parencite{woo2023} is a fully convolutional architecture that systematically modernises the ResNet paradigm by incorporating design elements from Vision Transformers: depthwise convolutions with large $7 \times 7$ kernels, an inverted bottleneck block structure, Layer Normalisation in place of Batch Normalisation, and the GELU activation function. The V2 variant introduces \textbf{Global Response Normalisation (GRN)}, which applies a global-to-local feature competition mechanism to prevent feature collapse during masked autoencoder pretraining:
+
+\begin{equation}
+\text{GRN}(X) = \gamma \cdot X \cdot \frac{\|X\|_2}{\|X\|_{global,2}} + \beta + X
+\label{eq:grn}
+\end{equation}
+
+\noindent where the ratio normalises local feature norms by the global average norm, $\gamma$ and $\beta$ are learnable scalar parameters, and the residual connection preserves the original features.
+
+The ConvNeXt V2-Tiny backbone (comprising four hierarchical stages with channel widths $[96, 192, 384, 768]$ and $[3, 3, 9, 3]$ blocks per stage, for 28.59M total parameters) is pretrained using \textbf{Fully Convolutional Masked Autoencoder (FCMAE)} \parencite{he2022mae} self-supervision on ImageNet-22k (14 million images, 22,000 categories), followed by supervised fine-tuning on ImageNet-1k. This two-stage pretraining provides the backbone with deeply hierarchical visual representations that generalise across diverse image recognition tasks.
+
+To preserve the quality of these pretrained representations while adapting to the financial chart domain, \textbf{Stages 0--2} of the four-stage backbone are frozen during training, with only Stage 3 (the deepest stage) and the classification head remaining trainable. This selective freezing strategy is motivated by the catastrophic forgetting phenomenon \parencite{he2016}: fine-tuning all layers of a large pretrained network on a small, domain-specific dataset risks overwriting general visual features with dataset-specific noise. Freezing the early stages, which encode low-level features (edges, textures, colour gradients) that are domain-agnostic, retains their representational quality while allowing the final stage to adapt to the semantic structure of financial chart images. The resulting trainable parameter count is 16.21M.
+
+\paragraph{Sequence Branch: iTransformer.}
+The iTransformer \parencite{liu2024itransformer} inverts the conventional Transformer application to multivariate time series. In standard Transformers, each time step is treated as a token and attention is applied across the temporal dimension, capturing which moments in the past are most informative. The iTransformer instead treats each \textit{feature} as a token and applies attention across the feature dimension:
+
+\begin{equation}
+\mathbf{Z}^{(f)} = \text{Attention}\!\left(\mathbf{X}^{(f)} W^Q,\; \mathbf{X}^{(f)} W^K,\; \mathbf{X}^{(f)} W^V\right)
+\label{eq:itransformer}
+\end{equation}
+
+\noindent where $\mathbf{X}^{(f)} \in \mathbb{R}^{F \times W}$ is the transposed feature matrix, so that each row represents the full temporal history of one indicator (e.g., the RSI values over all 20 days). Attention weights $a_{ij}$ quantify the pairwise predictive relevance between indicator $i$ and indicator $j$, capturing cross-indicator dependencies such as the interaction between momentum (RSI, MACD) and volatility (ATR, Bollinger Band width) signals. This design is particularly well-suited to the multivariate technical analysis setting: the 25 indicators span distinct economic mechanisms (trend, momentum, mean-reversion, volatility) whose interactions may carry predictive content beyond the sum of their individual signals.
+
+\paragraph{Loss Function: Asymmetric Focal Loss.}
+The Asymmetric Focal Loss (AFL) \parencite{ridnik2021} extends Focal Loss by applying different focusing parameters to the positive and negative classes:
+
+\begin{equation}
+\mathcal{L}_{AFL}(p,\, y) = \begin{cases}
+-(1 - p)^{\gamma^+} \log(p) & \text{if } y = 1 \\
+-p_m^{\gamma^-} \log(1 - p_m) & \text{if } y = 0
+\end{cases}
+\label{eq:afl}
+\end{equation}
+
+\noindent where $p_m = \max(p - m, 0)$ incorporates a probability margin $m$ that hard-thresholds the contribution of the easiest negative samples, $\gamma^+ = 1.0$ controls suppression of easy positive examples, and $\gamma^- = 2.0$ applies stronger suppression to easy negatives. The asymmetric design acknowledges the economic asymmetry inherent in financial prediction: in a long-short framework, incorrect bullish signals generate actual losses (undesirable), while incorrect bearish signals forego gains (less costly). Stronger penalisation of false negatives ($\gamma^- > \gamma^+$) reflects this asymmetry.
+
+\paragraph{Optimisation.}
+The backbone is optimised at $\eta_{backbone} = 10^{-5}$ and all other parameters at $\eta_{head} = 10^{-4}$, both three times smaller than the corresponding rates used for EfficientNet-B2. The more conservative schedule reflects the deeper pretraining of ConvNeXt V2 on ImageNet-22k, which provides a stronger visual prior that should be perturbed minimally when adapting to the financial domain.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Training Protocol}
+\label{sec:training}
+% ─────────────────────────────────────────────────────────────────────────────
+
+All three models share a unified training infrastructure to ensure comparability of results. Training is conducted on a single NVIDIA GeForce RTX 2070 GPU (8 GB VRAM) using PyTorch with CUDA acceleration.
+
+\paragraph{Optimiser.}
+The Adam optimiser \parencite{kingma2015} with $L_2$ weight decay is used across all models. Adam maintains exponential moving averages of the gradient ($m_t$) and its element-wise square ($v_t$), with bias correction:
+
+\begin{align}
+m_t &= \beta_1 m_{t-1} + (1-\beta_1) g_t \label{eq:adam_m}\\
+v_t &= \beta_2 v_{t-1} + (1-\beta_2) g_t^2 \label{eq:adam_v}\\
+\theta_{t+1} &= \theta_t - \frac{\eta}{\sqrt{\hat{v}_t} + \varepsilon}\hat{m}_t, \qquad \hat{m}_t = \frac{m_t}{1-\beta_1^t},\; \hat{v}_t = \frac{v_t}{1-\beta_2^t} \label{eq:adam_update}
+\end{align}
+
+\noindent with default hyperparameters $\beta_1 = 0.9$, $\beta_2 = 0.999$, $\varepsilon = 10^{-8}$, and weight decay $\lambda = 10^{-4}$ for all models.
+
+\paragraph{Learning Rate Scheduling.}
+For the two advanced models, a \texttt{ReduceLROnPlateau} scheduler monitors the validation AUC and halves all learning rates by a factor of 0.5 when no improvement is observed for 4 consecutive epochs, with a minimum learning rate floor of $10^{-6}$.
+
+\paragraph{Early Stopping.}
+Training terminates when the validation AUC fails to improve for a patience window of 7 consecutive epochs (2 epochs for the baseline model, following \textcite{Jiang2023}). At termination, the model checkpoint corresponding to the highest validation AUC is restored for subsequent evaluation. Early stopping prevents overfitting to the training distribution and ensures that the reported performance corresponds to the model that best generalises, within the constraint that generalisation is assessed only on the validation period.
+
+\paragraph{Mixed Precision Training.}
+Automatic Mixed Precision (AMP) training is applied throughout, maintaining forward pass computations in 16-bit floating point (FP16) and accumulating gradients in 32-bit (FP32) with gradient scaling to prevent underflow. AMP reduces GPU memory consumption by approximately 40\% and accelerates training by up to $2\times$ compared to full FP32 training, with negligible impact on model quality.
+
+\noindent Table~\ref{tab:training_config} summarises the complete training configuration for each model.
+
+\begin{table}[H]
+\centering
+\caption{Training Configuration by Model}
+\label{tab:training_config}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Hyperparameter} & \textbf{Model I (Baseline)} & \textbf{Model II (EfficientNet)} & \textbf{Model III (ConvNeXt)} \\
+\midrule
+Input image size        & $60 \times 64$ px    & $224 \times 224$ px   & $224 \times 224$ px   \\
+Image channels          & 1 (greyscale)        & 3 (RGB)               & 3 (RGB)               \\
+Sequence features       & --                   & 25                    & 25                    \\
+Batch size              & 512                  & 256                   & 128                   \\
+LR (head / classifier)  & $1 \times 10^{-5}$   & $3 \times 10^{-4}$    & $1 \times 10^{-4}$    \\
+LR (backbone)           & --                   & $3 \times 10^{-5}$    & $1 \times 10^{-5}$    \\
+Weight decay            & $1 \times 10^{-4}$   & $1 \times 10^{-4}$    & $1 \times 10^{-4}$    \\
+Early stopping patience & 2                    & 7                     & 7                     \\
+Max epochs              & 50                   & 30                    & 30                    \\
+Augmentation            & None                 & CutMix + Mixup        & None                  \\
+Loss function           & Cross-Entropy        & Focal Loss ($\gamma=2$) & Asym.\ Focal Loss   \\
+Ensemble runs           & 5                    & 1                     & 1                     \\
+Trainable parameters    & 11.7M                & 8.90M                 & 16.21M                \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Evaluation Framework}
+\label{sec:evaluation}
+% ─────────────────────────────────────────────────────────────────────────────
+
+Performance is assessed along three complementary dimensions: discriminative ability, statistical significance of pairwise differences, and economic profitability.
+
+\subsubsection{Classification Metrics}
+
+\paragraph{Area Under the ROC Curve.}
+The primary evaluation metric is the Area Under the Receiver Operating Characteristic Curve (AUC-ROC). For a binary classifier, the ROC curve traces the True Positive Rate ($\text{TPR}(\tau)$) against the False Positive Rate ($\text{FPR}(\tau)$) as the decision threshold $\tau$ sweeps from 0 to 1:
+
+\begin{equation}
+\text{AUC} = \int_0^1 \text{TPR}(\tau)\; d\,\text{FPR}(\tau) = P\!\left(\hat{p}_{pos} > \hat{p}_{neg}\right)
+\label{eq:auc}
+\end{equation}
+
+\noindent The second equality is the Wilcoxon-Mann-Whitney interpretation: the AUC equals the probability that a randomly drawn positive sample receives a higher predicted score than a randomly drawn negative sample \parencite{delong1988}. This probabilistic interpretation makes the AUC a natural measure of discriminative ability that is invariant to class imbalance and decision threshold, both desirable properties in the financial prediction context where neither the class balance nor the optimal trading threshold is known ex ante. A model with no predictive ability achieves $\text{AUC} = 0.5$.
+
+\paragraph{Accuracy and Macro F1 Score.}
+Classification accuracy and macro-averaged F1 are reported as secondary metrics:
+
+\begin{align}
+\text{Acc} &= \frac{TP + TN}{N} \label{eq:acc}\\
+\text{F1}_{macro} &= \frac{1}{2}\!\left(\frac{2\,TP_0}{2\,TP_0 + FP_0 + FN_0} + \frac{2\,TP_1}{2\,TP_1 + FP_1 + FN_1}\right) \label{eq:f1}
+\end{align}
+
+\noindent Macro-averaging treats both classes symmetrically, making F1 more informative than accuracy under the class imbalance present in the dataset.
+
+\paragraph{Brier Score.}
+The Brier Score \parencite{brier1950} measures probabilistic calibration — the degree to which predicted probabilities match empirical outcome frequencies:
+
+\begin{equation}
+\text{BS} = \frac{1}{N} \sum_{i=1}^{N} \left(\hat{p}_i - y_i\right)^2
+\label{eq:brier}
+\end{equation}
+
+\noindent A perfectly calibrated model achieves $\text{BS} = 0$; an uninformative model predicting $\hat{p} = 0.5$ always achieves $\text{BS} = 0.25$. Smaller values indicate better calibrated probability estimates, which is important for the probability-weighted trading strategies described below.
+
+\paragraph{Information Coefficient.}
+The Information Coefficient (IC) is the Spearman rank correlation between the vector of predicted up-probabilities $\hat{\mathbf{p}}$ and the vector of realised binary outcomes $\mathbf{y}$:
+
+\begin{equation}
+\text{IC} = \rho_S(\hat{\mathbf{p}},\, \mathbf{y}) = 1 - \frac{6\sum_i d_i^2}{N(N^2-1)}
+\label{eq:ic}
+\end{equation}
+
+\noindent where $d_i$ is the difference in ranks. The IC is a standard metric in quantitative asset management \parencite{Gu2020} that measures the cross-sectional alignment between model predictions and realisations. A positive IC is a necessary condition for the model's predictions to generate economic value.
+
+\paragraph{Bootstrap Confidence Intervals.}
+Uncertainty in AUC point estimates is quantified via the percentile bootstrap. For $B = 1{,}000$ bootstrap resamples, each of size $N$ drawn with replacement from $\mathcal{D}_{test}$, an AUC estimate $\hat{\theta}^*_b$ is computed. The 95\% confidence interval is:
+
+\begin{equation}
+\text{CI}_{95\%} = \left[\hat{\theta}^*_{(0.025)},\; \hat{\theta}^*_{(0.975)}\right]
+\label{eq:bootstrap}
+\end{equation}
+
+\subsubsection{Statistical Significance Testing}
+
+\paragraph{DeLong Test.}
+To assess whether observed AUC differences between pairs of models are statistically significant, the nonparametric DeLong test \parencite{delong1988} is applied. The DeLong test constructs a covariance estimate for paired AUC statistics using the structural components of the AUC as a U-statistic, correctly accounting for the positive correlation between AUC estimates that arises from using a common test set:
+
+\begin{equation}
+z = \frac{\hat{\theta}_A - \hat{\theta}_B}{\sqrt{\hat{S}_{AA} + \hat{S}_{BB} - 2\hat{S}_{AB}}}
+\label{eq:delong}
+\end{equation}
+
+\noindent where $\hat{S}_{AB}$ is the estimated covariance between the AUC estimators for models $A$ and $B$. Under the null hypothesis $H_0: \text{AUC}_A = \text{AUC}_B$, the statistic $z$ is asymptotically standard normal. All pairwise model comparisons are tested at significance levels $\alpha \in \{0.05, 0.01, 0.001\}$.
+
+\subsubsection{Trading Strategy Evaluation}
+
+Classification performance does not directly translate into economic value. A model with an AUC marginally above 0.5 may nonetheless generate economically meaningful returns if its predictions are concentrated on high-conviction signals with good directional accuracy \parencite{Gu2020}. Four trading strategies are therefore constructed to evaluate the economic significance of each model's out-of-sample predictions.
+
+\paragraph{Strategy Definitions.}
+Let $\hat{p}_{i,t}$ denote the predicted probability that stock $i$ produces a positive 20-day return starting at day $t$. The signed position $\delta_{i,t}$ (+1 = long, $-$1 = short, 0 = neutral) is defined as:
+
+\begin{align}
+\delta^{LS}_{i,t}  &= \text{sign}\!\left(\hat{p}_{i,t} - 0.5\right) &&\text{(Long-Short)} \label{eq:strat_ls}\\
+\delta^{LO}_{i,t}  &= \mathbb{1}\!\left[\hat{p}_{i,t} > 0.5\right] &&\text{(Long-Only)} \label{eq:strat_lo}\\
+\delta^{Q}_{i,t}   &= \mathbb{1}\!\left[\hat{p}_{i,t} \geq Q_{0.8}\right] - \mathbb{1}\!\left[\hat{p}_{i,t} \leq Q_{0.2}\right] &&\text{(Quintile)} \label{eq:strat_q}\\
+\delta^{PW}_{i,t}  &= 2\hat{p}_{i,t} - 1 &&\text{(Probability-Weighted)} \label{eq:strat_pw}
+\end{align}
+
+\noindent where $Q_{0.8}$ and $Q_{0.2}$ are the 80th and 20th percentiles of the predicted probability distribution at date $t$. The Long-Short strategy takes a position on every stock; Long-Only builds only bullish positions; the Quintile strategy concentrates on the most extreme predictions; and the Probability-Weighted strategy sizes positions continuously in proportion to conviction, mapping $\hat{p} \in [0,1]$ to $\delta \in [-1,+1]$.
+
+\paragraph{Portfolio Performance Metrics.}
+Portfolio returns are approximated using the binary label as a direction proxy: a long position in a stock with label $y_{i,t} = 1$ (up) generates a unit gain; a long position in a stock with $y_{i,t} = 0$ (down) generates a unit loss, and vice versa for shorts. The trade return is $r_{i,t} = \delta_{i,t} \cdot (2y_{i,t} - 1)$. This approximation abstracts from cross-sectional variation in return magnitude, focusing evaluation on directional accuracy rather than return size.
+
+The \textbf{Sharpe Ratio} \parencite{sharpe1966}, annualised for the 20-day trading horizon:
+
+\begin{equation}
+\text{SR} = \frac{\bar{R}}{\hat{\sigma}_R} \cdot \sqrt{\frac{252}{20}}
+\label{eq:sharpe}
+\end{equation}
+
+\noindent where $\bar{R}$ and $\hat{\sigma}_R$ are the sample mean and standard deviation of period returns, and the factor $\sqrt{252/20} \approx 3.55$ annualises the ratio assuming 252 trading days and non-overlapping 20-day periods.
+
+The \textbf{Sortino Ratio} \parencite{sortino1994}, which penalises only downside volatility:
+
+\begin{equation}
+\text{Sortino} = \frac{\bar{R}}{\hat{\sigma}^-_R} \cdot \sqrt{\frac{252}{20}}, \qquad \hat{\sigma}^-_R = \sqrt{\frac{1}{N^-}\sum_{t:\, R_t < 0} R_t^2}
+\label{eq:sortino}
+\end{equation}
+
+The \textbf{Maximum Drawdown (MDD)}, the largest peak-to-trough decline in the cumulative return series:
+
+\begin{equation}
+\text{MDD} = \min_{t \in [1,T]} \frac{W_t - \max_{s \leq t} W_s}{\max_{s \leq t} W_s}, \qquad W_t = \prod_{s=1}^{t}(1 + c \cdot R_s)
+\label{eq:mdd}
+\end{equation}
+
+\noindent where $c = 0.01$ is an assumed 1\% trade magnitude and $W_t$ is the cumulative wealth index.
+
+The \textbf{Hit Rate}, the fraction of trades in which the model's directional prediction is correct:
+
+\begin{equation}
+\text{HR} = \frac{1}{T} \sum_{t=1}^{T} \mathbb{1}\!\left[\delta_{i,t} \cdot (2y_{i,t}-1) > 0\right]
+\label{eq:hitrate}
+\end{equation}
+
+\paragraph{Temporal and Regime Analysis.}
+To assess the stability of model performance over time, AUC is reported both annually (year-by-year breakdown from 2021 to 2026) and as a rolling statistic computed over a sliding window of 500 observations. Additionally, the OOS period is partitioned into four distinct market regimes: the post-pandemic bull market (2021), the monetary policy tightening and bear market (2022), the recovery phase (2023--2024), and the most recent period (2025). Regime-conditional AUC values reveal whether model predictions are robust across structural market shifts or concentrated in specific environments.
+
+\paragraph{Ensemble.}
+An ensemble prediction is constructed for observations falling in the intersection of the test sets of all available models, by averaging the predicted probabilities:
+
+\begin{equation}
+\hat{p}^{ens}_{i,t} = \frac{1}{K} \sum_{k=1}^{K} \hat{p}^{(k)}_{i,t}
+\label{eq:ensemble}
+\end{equation}
+
+\noindent where $K$ is the number of models with valid predictions for observation $(i,t)$. Ensembling exploits the diversity of the three model architectures — which differ in image representation, backbone, sequence encoder, and loss function — to reduce variance and potentially improve calibration.
 
 
 
