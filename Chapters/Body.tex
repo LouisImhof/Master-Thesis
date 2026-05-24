@@ -1,4 +1,132 @@
+% ============================================================
+% body_draft.tex  —  Body / Hypothesis Development
+% Copy contents into Chapters/Body.tex
+% No extra packages needed — figure uses only base LaTeX
+% ============================================================
+
 \newpage
-\section{Main Part}
+\section{Hypothesis Development}
 
+\subsection{Conceptual Framework}
 
+This thesis builds on three areas of research that, taken together, motivate applying deep learning to price chart images in European equity markets.
+
+The first area is machine learning in asset pricing. \textcite{Gu2020} show that flexible non-linear models predict the cross-section of U.S. stock returns substantially better than linear benchmarks. The signals that matter most in their analysis are momentum, volatility, and liquidity, which are exactly the kind of information that price charts display visually. This justifies replacing hand-crafted factor models with data-driven image recognition approaches.
+
+The second area is technical analysis. The review by \textcite{Park2007} covers 95 studies and finds that technical trading rules generate consistent profits across different markets, even if profitability has declined as markets became more competitive. Earlier work by \textcite{lo2000} uses nonparametric methods to show that classical formations such as the head-and-shoulders or double bottom carry information about future return distributions in U.S. stocks. These findings challenge the weak form of the Efficient Market Hypothesis \parencite{fama1970} and provide a basis for expecting predictive content in chart images.
+
+The third area is the image-based deep learning literature, in particular \textcite{Jiang2023}. They convert OHLCV data into standardised two-dimensional images and train convolutional neural networks to predict the direction of future returns. The resulting trading strategies significantly outperform momentum and reversal benchmarks on U.S. stocks, and the learned patterns appear to transfer across time horizons and international markets. This is the direct methodological predecessor of the present thesis.
+
+Figure \ref{fig:conceptual_framework} summarises how these three strands connect.
+
+\begin{figure}[H]
+  \centering
+  \renewcommand{\arraystretch}{1.4}
+  \begin{tabular}{ccc}
+    \fbox{\parbox{3.8cm}{\centering \textbf{ML Asset Pricing}\\[2pt]
+          {\small Gu et al.\ (2020)}}}
+    & \hspace{1.5cm} &
+    \fbox{\parbox{3.8cm}{\centering \textbf{Technical Analysis}\\[2pt]
+          {\small Park \& Irwin (2007)}}} \\[6pt]
+    & $\searrow \hspace{0.4cm} \swarrow$ & \\[-4pt]
+    &
+    \fbox{\parbox{4.2cm}{\centering \textbf{Chart-Based Deep Learning}\\[2pt]
+          {\small Jiang, Kelly \& Xiu (2023)}}}
+    & \\[6pt]
+    & $\downarrow$ & \\[-4pt]
+    &
+    \fbox{\parbox{4.2cm}{\centering \textbf{This Thesis}\\[2pt]
+          {\small Euro Stoxx 50 + Crypto Transfer}}}
+    & \\
+  \end{tabular}
+  \caption{Conceptual framework: three literature strands converging on the research design of this thesis.}
+  \label{fig:conceptual_framework}
+\end{figure}
+
+From this framework, four empirical questions arise naturally. Does the CNN signal from \textcite{Jiang2023} hold in European equities? Do newer and more complex architectures improve on their baseline? Do European-trained models perform at a similar level to the U.S. results they report? And do the visual features generalise to cryptocurrency markets, which share the charting format but differ in almost every other respect? The following subsections turn each question into a testable hypothesis.
+
+\subsection{Hypotheses}
+
+\subsubsection*{Hypothesis 1: Predictive Power in European Equities}
+
+The starting point of this thesis is whether CNN chart pattern models have any predictive power for short-term returns in the Euro Stoxx 50. \textcite{Jiang2023} establish this for U.S. stocks over 1993 to 2020, but European equity markets differ from the U.S. in market microstructure, regulation, and investor composition. Whether the result carries over is an open empirical question.
+
+The primary evaluation metric is the Area Under the Receiver Operating Characteristic Curve (AUC-ROC). An AUC of 0.5 means the model performs no better than a coin flip, while values above 0.5 reflect positive directional skill. The hypothesis is:
+
+\begin{equation}
+  H_{10}: \text{AUC} \leq 0.5
+\end{equation}
+\begin{equation}
+  H_{1a}: \text{AUC} > 0.5
+\end{equation}
+
+where AUC is measured out-of-sample over the test period 2021 to 2026. Significance is assessed using a one-sided bootstrap confidence interval. The economic reasoning behind expecting a positive signal is that momentum and trend patterns have been found across many international equity markets \parencite{Jegadeesh1993}, and their visual representations in price charts should be structurally similar regardless of which exchange the stocks trade on.
+
+\subsubsection*{Hypothesis 2: Architectural Advances over the Baseline}
+
+The baseline model from \textcite{Jiang2023} is a three-block VGG-style CNN trained on single-scale grayscale images. Since that paper appeared, image recognition architectures have improved considerably. ConvNeXt V2 \parencite{liu2022convnext} and EfficientNet-B2 both benefit from pre-training on ImageNet-21k and from architectural improvements over standard VGG networks. In addition, Transformer-based sequence encoders \parencite{vaswani2017} allow the models in this thesis to process 25 quantitative technical indicators alongside the image, a capability the original baseline lacks entirely.
+
+The hypothesis is that these improvements translate into better out-of-sample performance:
+
+\begin{equation}
+  H_{20}: \text{AUC}_{\text{advanced}} \leq \text{AUC}_{\text{baseline}}
+\end{equation}
+\begin{equation}
+  H_{2a}: \text{AUC}_{\text{advanced}} > \text{AUC}_{\text{baseline}}
+\end{equation}
+
+Two advanced models are tested separately. The first pairs EfficientNet-B2 with a standard Transformer sequence encoder. The second pairs ConvNeXt V2-Tiny with an iTransformer encoder \parencite{liu2024itransformer}, which treats each technical indicator as a token rather than each time step, allowing attention to model cross-indicator relationships. Pairwise AUC differences are tested with the DeLong test \parencite{delong1988}, which is appropriate when two models are evaluated on the same observations.
+
+The rationale for expecting improvement is twofold. The multi-scale RGB image encoding used in the advanced models exposes the network to visual information at three time horizons simultaneously (5, 20, and 60 trading days), whereas the baseline sees only one. And the addition of a numerical indicator branch means the model can combine visual pattern recognition with precise quantitative signal.
+
+\subsubsection*{Hypothesis 3: Geographical Generalisation}
+
+\textcite{Jiang2023} argue that the patterns their models learn are not specific to the U.S. but reflect universal price formation mechanisms, and they provide some international evidence in support of this claim. This thesis offers a more direct test by replicating their architecture on Euro Stoxx 50 data and comparing the out-of-sample AUC to the results they report for U.S. markets.
+
+If the patterns are truly universal, the European model should perform at a similar level to the U.S. benchmark. If they are market-specific, there will be a clear gap. The hypothesis is two-sided because it is not obvious in which direction any difference should go:
+
+\begin{equation}
+  H_{30}: \text{AUC}_{\text{European}} \approx \text{AUC}_{\text{U.S., Jiang (2023)}}
+\end{equation}
+\begin{equation}
+  H_{3a}: \text{AUC}_{\text{European}} \neq \text{AUC}_{\text{U.S., Jiang (2023)}}
+\end{equation}
+
+One caveat is that the evaluation windows do not overlap: the test period here is 2021 to 2026, while \textcite{Jiang2023} evaluate up to 2020. This makes the comparison imperfect, and the difference in market conditions between the two periods is an acknowledged limitation. The comparison is nonetheless informative as a broad check on whether the European signal is in the same range as what the original paper reports.
+
+\subsubsection*{Hypothesis 4: Transfer to Cryptocurrency Markets}
+
+The last hypothesis asks whether models trained on European equities retain any predictive power when applied directly to Bitcoin and Ethereum. Cryptocurrency markets share the candlestick charting format with equity markets and show clear momentum and reversal dynamics \parencite{liu2021}. At the same time, they differ from blue-chip equities in almost every institutional respect: there is no fundamental anchor value, trading runs continuously around the clock, and volatility is far higher.
+
+No retraining is performed. The model weights learned from Euro Stoxx 50 data are applied as-is to cryptocurrency chart images and indicator sequences over the same out-of-sample period 2021 to 2026:
+
+\begin{equation}
+  H_{40}: \text{AUC}_{\text{crypto}} \leq 0.5
+\end{equation}
+\begin{equation}
+  H_{4a}: \text{AUC}_{\text{crypto}} > 0.5
+\end{equation}
+
+Rejecting the null would suggest that the CNN has learned visual features that go beyond the specific market it was trained on. Failing to reject would point to the predictive signal being tied to the institutional environment of European equity markets.
+
+\subsection{Overview}
+
+Table \ref{tab:hypotheses_summary} gives a compact overview of the four hypotheses.
+
+\begin{table}[H]
+  \centering
+  \caption{Summary of hypotheses, metrics, and test procedures.}
+  \label{tab:hypotheses_summary}
+  \begin{tabular}{clll}
+    \toprule
+    & \textbf{Research question} & \textbf{Metric} & \textbf{Test} \\
+    \midrule
+    H1 & European CNN AUC above 0.5?       & OOS AUC-ROC        & Bootstrap CI \\[3pt]
+    H2 & Advanced models beat baseline?    & Pairwise AUC gap   & DeLong test  \\[3pt]
+    H3 & European results match U.S.?      & AUC vs.\ \textcite{Jiang2023} & Benchmark comparison \\[3pt]
+    H4 & Equity model predicts crypto?     & Crypto OOS AUC     & Bootstrap CI \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The methodology chapter that follows explains in detail how the data is prepared, how images are constructed, how each model is trained, and how the results are evaluated.
