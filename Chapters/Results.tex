@@ -1,6 +1,316 @@
+% ============================================================
+% results_draft.tex
+% ============================================================
+
 \newpage
 \section{Results}
 
+This chapter presents and interprets the out-of-sample results for all five models across the four research hypotheses. Section~\ref{sec:res_h1} covers H1 (predictive power in European equities). Section~\ref{sec:res_h2} covers H2 (architectural improvements) including the image encoding comparison. Section~\ref{sec:res_h3} discusses H3 (geographical generalisability). Section~\ref{sec:res_h4} covers H4 (cryptocurrency transfer). Section~\ref{sec:portfolio} reports the portfolio performance, and Section~\ref{sec:temporal} covers temporal and regime analysis.
 
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{H1: Predictive Power in European Equities}
+\label{sec:res_h1}
+% ─────────────────────────────────────────────────────────────────────────────
 
+Table~\ref{tab:main_metrics} shows the full set of classification metrics for the three main models over the out-of-sample test period 2021--2026.
 
+\begin{table}[H]
+\centering
+\caption{Out-of-Sample Classification Metrics, Main Models (Test Period 2021--2026)}
+\label{tab:main_metrics}
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Model} & \textbf{AUC} & \textbf{95\% CI} & \textbf{Acc} & \textbf{F1 (macro)} & \textbf{IC} \\
+\midrule
+Baseline CNN   & 0.5130 & [0.508, 0.517] & 0.562 & 0.372 & 0.022 \\
+EfficientNet-B2 & 0.5127 & [0.508, 0.517] & 0.490 & 0.484 & 0.022 \\
+ConvNeXt V2    & 0.5179 & [0.514, 0.522] & 0.545 & 0.477 & 0.031 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All three models achieve AUC above 0.5, with 95\% confidence intervals that lie entirely above 0.5. This provides clear evidence against the null hypothesis $H_{10}$ that no model has any predictive power in European equities. The result holds even for the simplest model, the Baseline CNN, which was designed to replicate an existing published architecture.
+
+The predictive signal is modest. AUC values in the range 0.51--0.52 represent a small but real ability to rank stocks by their likely direction over the next 20 trading days, consistent with the level of signal typically found in academic return prediction studies \parencite{Gu2020}. They do not imply that the models can reliably classify any individual stock as up or down.
+
+The ROC curves and calibration plots for all three models are shown in Figures~\ref{fig:roc_curves} and~\ref{fig:calibration}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/roc_curves.png}
+\caption{ROC curves for the three main models over the out-of-sample test period 2021--2026. All three models lie above the diagonal, confirming positive directional skill.}
+\label{fig:roc_curves}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/calibration.png}
+\caption{Calibration curves for the three main models. The Brier Scores are 0.250 (Baseline CNN), 0.253 (EfficientNet-B2), and 0.247 (ConvNeXt V2). All models are reasonably calibrated around the 0.55 class frequency.}
+\label{fig:calibration}
+\end{figure}
+
+The Brier Scores cluster around 0.25, close to the Brier Score of an uninformative model predicting the base rate of 0.55 throughout. This is expected given the small AUC values and reflects how difficult short-term equity return prediction is. The IC values are around 0.02--0.03, indicating positive but small cross-sectional alignment between the model's rankings and actual outcomes.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{H2: Architecture Comparison and Image Encoding}
+\label{sec:res_h2}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsubsection{Main Architecture Comparison}
+
+From Table~\ref{tab:main_metrics}, ConvNeXt V2 achieves the highest AUC at 0.5179, followed closely by the Baseline CNN at 0.5130 and EfficientNet-B2 at 0.5127. The gap between the best model and the baseline is only 0.005 AUC points.
+
+The confusion matrices in Figure~\ref{fig:confusion_matrices} reveal an important qualitative difference between the models. The Baseline CNN and ConvNeXt V2 show a bias toward predicting Up, which is consistent with the positive class frequency of 55\% in the data. EfficientNet-B2, by contrast, produces a more balanced distribution of predictions. The EfficientNet model with Focal Loss and label smoothing was calibrated specifically to avoid the over-prediction of the majority class.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/confusion_matrices.png}
+\caption{Confusion matrices for the three main models. Baseline CNN and ConvNeXt V2 tend to predict Up more often, while EfficientNet-B2 is more balanced.}
+\label{fig:confusion_matrices}
+\end{figure}
+
+The prediction score distributions are shown in Figure~\ref{fig:pred_distribution}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/pred_distribution.png}
+\caption{Distribution of predicted up-probabilities for each model. The Baseline CNN concentrates predictions above 0.5, EfficientNet-B2 spreads them more evenly, and ConvNeXt V2 shows a bimodal distribution with mass at both ends.}
+\label{fig:pred_distribution}
+\end{figure}
+
+The advanced models do not significantly outperform the Baseline CNN, so $H_{20}$ (that the advanced models beat the baseline) cannot be rejected at conventional significance levels. The added complexity of the pretrained backbone and the sequence encoder does not translate into a meaningful AUC improvement on this dataset. This is consistent with the broader literature, where improvements from more complex architectures tend to be small in financial prediction tasks \parencite{Gu2020}.
+
+\subsubsection{Image Encoding Comparison (V3 vs V4)}
+
+Table~\ref{tab:comparison_metrics} shows the results from the image encoding comparison experiment, where both hybrid models are retrained on both the v3 candlestick image format and the v4 multi-scale RGB format.
+
+\begin{table}[H]
+\centering
+\caption{Image Encoding Comparison: Classification Metrics (Test Period 2021--2026)}
+\label{tab:comparison_metrics}
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Model} & \textbf{AUC} & \textbf{95\% CI} & \textbf{Acc} & \textbf{F1 (macro)} & \textbf{IC} \\
+\midrule
+Baseline CNN      & 0.5130 & [0.508, 0.517] & 0.562 & 0.372 & 0.022 \\
+EfficientNet-v3   & 0.5019 & [0.498, 0.506] & 0.539 & 0.467 & 0.003 \\
+EfficientNet-v4   & 0.5131 & [0.508, 0.517] & 0.535 & 0.488 & 0.023 \\
+ConvNeXt-v3       & 0.5057 & [0.501, 0.510] & 0.530 & 0.485 & 0.010 \\
+ConvNeXt-v4       & 0.5141 & [0.510, 0.518] & 0.559 & 0.399 & 0.024 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The v4 image consistently outperforms v3 for both architectures. EfficientNet-v4 achieves an AUC of 0.5131 compared to 0.5019 for EfficientNet-v3, a difference of 0.011 AUC points. ConvNeXt-v4 achieves 0.5141 versus 0.5057 for ConvNeXt-v3, a difference of 0.008 AUC points.
+
+Table~\ref{tab:delong} reports the DeLong test results for all pairwise comparisons.
+
+\begin{table}[H]
+\centering
+\caption{DeLong Test Results for Pairwise AUC Comparisons}
+\label{tab:delong}
+\begin{tabular}{lccccr}
+\toprule
+\textbf{Comparison} & \textbf{AUC A} & \textbf{AUC B} & \textbf{z} & \textbf{p-value} & \textbf{Sig.} \\
+\midrule
+EfficientNet: v3 vs v4   & 0.5022 & 0.5117 & $-$3.49 & 0.0005 & *** \\
+ConvNeXt: v3 vs v4       & 0.5053 & 0.5139 & $-$3.21 & 0.0013 & **  \\
+v3 image: EfficientNet vs ConvNeXt & 0.5017 & 0.5059 & $-$1.67 & 0.095  & ns  \\
+v4 image: EfficientNet vs ConvNeXt & 0.5131 & 0.5140 & $-$0.30 & 0.762  & ns  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The v4 advantage is statistically significant for both architectures at $p < 0.01$. EfficientNet-v3 versus v4 yields $z = -3.49$ ($p = 0.0005$, ***) and ConvNeXt-v3 versus v4 yields $z = -3.21$ ($p = 0.0013$, **). The ROC panels in Figure~\ref{fig:roc_panels} confirm that v4 produces curves that sit consistently above v3 for both models.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/01_roc_panels.png}
+\caption{ROC curves from the image encoding comparison. Left panel: Baseline CNN alone. Centre panel: EfficientNet with v3 (solid blue) and v4 (dashed blue), and the Baseline CNN as a grey reference. Right panel: ConvNeXt with v3 (solid orange) and v4 (dashed orange), and the Baseline CNN as a grey reference. V4 consistently lies above v3 in both hybrid panels.}
+\label{fig:roc_panels}
+\end{figure}
+
+The architecture comparisons (EfficientNet vs ConvNeXt within each image type) are not significant, with $p = 0.095$ for the v3 image and $p = 0.762$ for the v4 image. This means that once the image format is fixed, both architectures perform at a similar level. The choice of image encoding matters more than the choice of backbone.
+
+Figure~\ref{fig:v4_delta} shows the year-by-year AUC advantage of v4 over v3 for each architecture.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/09_v4_delta_yearly.png}
+\caption{Year-by-year AUC difference between v4 and v3 ($\Delta$AUC = v4 minus v3) for EfficientNet and ConvNeXt. Positive values indicate v4 outperforming v3 in that year. The v4 advantage is not uniform across years but is mostly positive and largest in 2021 and 2022.}
+\label{fig:v4_delta}
+\end{figure}
+
+The improvement from v4 is not uniform across years. In 2021 and 2022 the advantage is clearest, while in 2023--2024 the difference narrows and occasionally reverses. This suggests that the multi-scale structure of v4 is more informative in trending or volatile markets but provides less of an advantage in range-bound or mean-reverting conditions.
+
+The calibration plots for the comparison models are shown in Figure~\ref{fig:comp_calibration}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/02_calibration.png}
+\caption{Calibration curves for all five comparison models. V4 models tend to be better calibrated than their v3 counterparts.}
+\label{fig:comp_calibration}
+\end{figure}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{H3: Geographical Generalisability}
+\label{sec:res_h3}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\textcite{Jiang2023} report AUC values of around 0.54--0.56 for their best models on U.S. equities over the period 1993--2020 under the I20R20 specification. The European models in this thesis achieve AUC values of 0.513--0.518 over the test period 2021--2026. This places European predictability below the U.S. benchmark by around 2--4 AUC percentage points.
+
+Several factors make a direct comparison difficult. The evaluation periods do not overlap: the U.S. results cover 1993--2020 and the European results cover 2021--2026. The post-pandemic period may be genuinely harder to predict, as it involved unprecedented monetary policy shifts and unusual cross-sectional return dynamics. In addition, the Euro Stoxx 50 has only 50 stocks, while \textcite{Jiang2023} work with thousands of U.S. stocks. The smaller cross-section reduces statistical power and limits the model's ability to learn from diverse pattern examples.
+
+With these caveats, the European results are in the same general range as the U.S. results rather than far below them. The signal exists in European equities, but it appears somewhat weaker, which is in line with findings from international studies suggesting that European markets are somewhat more efficient than U.S. markets for momentum-based strategies \parencite{cakici2023}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{H4: Transfer to Cryptocurrency Markets}
+\label{sec:res_h4}
+% ─────────────────────────────────────────────────────────────────────────────
+
+Table~\ref{tab:crypto_metrics} reports the out-of-sample results from applying the Euro Stoxx 50 trained models directly to Bitcoin (BTC-USD) and Ethereum (ETH-USD) without any retraining.
+
+\begin{table}[H]
+\centering
+\caption{Cryptocurrency Transfer Results (BTC-USD and ETH-USD, 2021--2026)}
+\label{tab:crypto_metrics}
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Model} & \textbf{AUC} & \textbf{Acc} & \textbf{F1 (macro)} & \textbf{Brier} & \textbf{IC} \\
+\midrule
+Baseline CNN   & 0.5084 & 0.498 & 0.495 & 0.251 & 0.014 \\
+EfficientNet-B2 & 0.5135 & 0.505 & 0.469 & 0.253 & 0.023 \\
+ConvNeXt V2    & \textbf{0.5433} & 0.532 & 0.516 & 0.249 & 0.075 \\
+Ensemble       & 0.5285 & 0.524 & 0.523 & 0.250 & 0.049 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+ConvNeXt V2 achieves an AUC of 0.5433 on cryptocurrency data, a meaningful increase over its equity market performance of 0.5179. The ensemble of all three models achieves 0.5285. The Baseline CNN and EfficientNet-B2 show more modest transfer, at 0.5084 and 0.5135 respectively.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/crypto_roc_curves.png}
+\caption{ROC curves for cryptocurrency transfer evaluation (BTC-USD and ETH-USD, 2021--2026). ConvNeXt V2 shows the clearest separation from the diagonal, followed by the ensemble.}
+\label{fig:crypto_roc}
+\end{figure}
+
+The strong ConvNeXt result on cryptocurrency data is surprising. One possible explanation is that cryptocurrency markets show clearer momentum and trend patterns than equity markets, which could make visual chart signals more useful. The longer time horizons encoded in the v4 multi-scale image (5d, 20d, 60d) may also align well with cryptocurrency price dynamics, which tend to exhibit multi-week trending behaviour \parencite{liu2021}.
+
+The crypto cumulative return curves are shown in Figure~\ref{fig:crypto_returns}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/crypto_cumulative_returns.png}
+\caption{Cumulative returns from the long-short strategy applied to cryptocurrency data (2021--2026). ConvNeXt V2 shows sustained positive performance, while the Baseline CNN and EfficientNet-B2 are closer to flat.}
+\label{fig:crypto_returns}
+\end{figure}
+
+The IC of 0.075 for ConvNeXt V2 on cryptocurrencies is more than twice its equity market IC of 0.031, providing further evidence that the model's cross-sectional rankings align more strongly with actual outcomes in the crypto setting. Whether this reflects a genuine transferable signal or an artefact of the specific test period is not fully clear, and the small sample of only two assets limits the reliability of this finding.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Portfolio Performance}
+\label{sec:portfolio}
+% ─────────────────────────────────────────────────────────────────────────────
+
+Table~\ref{tab:portfolio} summarises portfolio performance across the four trading strategies for the three main models and for the v4 comparison models, which achieved the best classification performance.
+
+\begin{table}[H]
+\centering
+\caption{Portfolio Performance, Long-Short Strategy (Test Period 2021--2026)}
+\label{tab:portfolio}
+\begin{tabular}{lccccr}
+\toprule
+\textbf{Model} & \textbf{Sharpe} & \textbf{Sortino} & \textbf{Max DD} & \textbf{Hit Rate} & \textbf{N trades} \\
+\midrule
+Baseline CNN      & 0.958 & 1.834 & $-$0.306 & 0.605 & 1,354 \\
+EfficientNet-v3   & 0.896 & 1.698 & $-$0.226 & 0.590 & 1,345 \\
+EfficientNet-v4   & 0.930 & 1.723 & $-$0.150 & 0.588 & 1,346 \\
+ConvNeXt-v3       & 0.808 & 1.431 & $-$0.168 & 0.582 & 1,345 \\
+ConvNeXt-v4       & \textbf{0.973} & \textbf{1.863} & $-$0.300 & 0.601 & 1,346 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The Baseline CNN achieves a long-short Sharpe Ratio of 0.958, and ConvNeXt-v4 reaches 0.973. The two v3 models, EfficientNet-v3 and ConvNeXt-v3, show lower Sharpe Ratios of 0.896 and 0.808 respectively, consistent with their lower AUC values. EfficientNet-v4 has the lowest maximum drawdown at $-$0.150, meaning its directional errors were smaller in magnitude even though its Sharpe Ratio is lower than the baseline.
+
+The full portfolio results across all four strategies are shown in Figure~\ref{fig:cumulative_returns} (main models) and Figure~\ref{fig:comp_returns} (comparison models).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/cumulative_returns.png}
+\caption{Cumulative returns from four trading strategies (long-short, long-only, quintile, probability-weighted) for the three main models over 2021--2026. All strategies show positive cumulative performance for the Baseline CNN and ConvNeXt V2.}
+\label{fig:cumulative_returns}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/05_cumulative_returns.png}
+\caption{Cumulative returns from the long-short strategy for all five comparison models over 2021--2026. ConvNeXt-v4 and Baseline CNN accumulate the most gains; the v3 models lag behind.}
+\label{fig:comp_returns}
+\end{figure}
+
+The probability-weighted strategy consistently achieves the highest Sharpe Ratios across models. For the Baseline CNN it reaches 0.996, and for EfficientNet-v4 it reaches 1.074. This suggests that the continuous probability scores carry more information than the binary classification threshold, and that sizing positions in proportion to conviction adds value relative to a fixed-size long-short position.
+
+The quintile strategy, which trades only the top and bottom 20\% of predictions, performs poorly relative to the other strategies, with some negative Sharpe Ratios for the v3 models. This indicates that the most extreme predictions from the v3 models are not more accurate than the median predictions, possibly reflecting miscalibrated tail probabilities. The v4 models show positive quintile Sharpe Ratios, consistent with better tail calibration.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Temporal Stability and Regime Analysis}
+\label{sec:temporal}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsubsection{Year-by-Year AUC}
+
+Table~\ref{tab:yearly_auc} shows the year-by-year AUC for all five comparison models.
+
+\begin{table}[H]
+\centering
+\caption{Year-by-Year Out-of-Sample AUC (2021--2026)}
+\label{tab:yearly_auc}
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Model} & \textbf{2021} & \textbf{2022} & \textbf{2023} & \textbf{2024} & \textbf{2025} & \textbf{2026} \\
+\midrule
+Baseline CNN    & 0.518 & 0.539 & 0.493 & 0.512 & 0.497 & 0.558 \\
+EfficientNet-v3 & 0.523 & 0.516 & 0.485 & 0.480 & 0.507 & 0.517 \\
+EfficientNet-v4 & 0.523 & 0.533 & 0.507 & 0.488 & 0.517 & 0.538 \\
+ConvNeXt-v3     & 0.510 & 0.537 & 0.476 & 0.505 & 0.501 & 0.558 \\
+ConvNeXt-v4     & 0.534 & 0.528 & 0.487 & 0.505 & 0.519 & 0.571 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/03_yearly_auc.png}
+\caption{Year-by-year AUC for all five comparison models. Performance varies across years but is consistently above 0.5 on average. 2023 and 2024 show the most uniform weakness across all models.}
+\label{fig:yearly_auc}
+\end{figure}
+
+All models perform above 0.5 in most years. The weakest year across all models is 2023, where AUCs range from 0.476 to 0.507. The year 2022, which covers the aggressive rate-hiking cycle and the bear market, is among the better years for the Baseline CNN and ConvNeXt-v3, suggesting that these models are more effective in directional markets. The partial year 2026 shows particularly high AUC values (0.538--0.571) for the v4 models, though this is based on fewer observations.
+
+\subsubsection{Regime Analysis}
+
+Figure~\ref{fig:regime_auc} shows AUC performance broken down by four market regimes.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/04_regime_auc.png}
+\caption{AUC by market regime for all five comparison models. The four regimes are: post-pandemic bull (2021), rate-hiking bear market (2022), recovery (2023--2024), and recent period (2025). The rate-hiking regime tends to be slightly more predictable than the recovery period.}
+\label{fig:regime_auc}
+\end{figure}
+
+The pattern in Figure~\ref{fig:regime_auc} shows that the 2022 bear market regime is the most predictable for most models. This is consistent with the observation that trending, directional markets, whether up or down, provide clearer chart signals than mean-reverting or choppy markets. The recovery period (2023--2024) is the weakest, likely because the post-pandemic recovery involved high cross-sectional dispersion and frequent reversals that are harder to predict from 20-day chart patterns.
+
+\subsubsection{Rolling AUC}
+
+Figure~\ref{fig:rolling_auc} shows rolling 500-observation AUC for all five models over the test period.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/08_rolling_auc.png}
+\caption{Rolling AUC (500-observation window) for all five comparison models over the out-of-sample test period. All models fluctuate around 0.50--0.52, with occasional dips below 0.5 and peaks above 0.53.}
+\label{fig:rolling_auc}
+\end{figure}
+
+The rolling AUC confirms that performance is not stable over time. There are extended periods where all models simultaneously perform well or poorly, suggesting that the predictability of the Euro Stoxx 50 varies with broader market conditions rather than being a stable property of any individual model. The co-movement of all model AUCs points to a common factor driving predictability, likely related to the market regime.

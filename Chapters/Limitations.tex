@@ -1,3 +1,44 @@
+% ============================================================
+% limitations_draft.tex
+% ============================================================
+
 \newpage
 \section{Limitations}
 
+\subsection{Sample Size and Universe}
+
+The empirical analysis covers 50 stocks. While the Euro Stoxx 50 provides a clean and liquid sample with a long history, it is a small cross-section compared to most academic return prediction studies. \textcite{Gu2020} work with several thousand U.S. stocks, and \textcite{Jiang2023} use all liquid NYSE and NASDAQ stocks over nearly three decades. With 50 stocks and a 20-day prediction horizon, there are only around 250 non-overlapping cross-sections per year in the test set. This limits statistical power for detecting small effects and makes the results sensitive to the behaviour of individual large-cap stocks.
+
+The 50-stock universe also means the model cannot learn from a diverse range of company types, market caps, or liquidity conditions during training. All stocks in the index are blue-chip and highly liquid. Whether the results generalise to smaller or less liquid European stocks is an open question.
+
+\subsection{Transaction Costs and Implementation}
+
+The portfolio analysis abstracts from transaction costs, bid-ask spreads, market impact, and short-selling constraints. For a 20-day horizon strategy trading blue-chip Euro Stoxx 50 stocks, transaction costs are likely manageable relative to the simulated returns, but they are not zero. The quantile strategy in particular takes smaller and more concentrated positions that would incur higher percentage costs if implemented.
+
+Individual trade returns are capped at 1\% per period, which is a simplification. In practice, return magnitudes vary substantially across stocks and periods, and the directional accuracy of the model may be more or less useful depending on how large the realised moves are.
+
+\subsection{Validation Set Design}
+
+The validation period covers 2019--2020, which includes the COVID-19 market shock. This event was one of the sharpest and fastest bear-to-bull reversals in modern market history. Models that perform well under high volatility during validation will be selected preferentially, which may introduce a bias toward architectures that are better suited to crisis periods. The out-of-sample test period (2021--2026) includes a bear market in 2022 but is otherwise less extreme in terms of daily volatility. This mismatch between validation and test conditions is a structural limitation of any fixed walk-forward design.
+
+\subsection{Image Encoding Completeness}
+
+The v3 and v4 image formats cover different aspects of price dynamics, but both leave out potentially useful information. For example, the v3 format packs many indicators into a small image, which may make it harder for the CNN to extract clean signals from any individual panel. The v4 format uses only price and volume data across three time scales, ignoring momentum indicators entirely in the image itself (though they are included in the sequence branch). Other image representations, such as volumetric bar charts, point-and-figure charts, or tick-based images, were not explored.
+
+The comparison between v3 and v4 showed that v4 outperforms v3 significantly, but this result is specific to the architectures and hyperparameters tested. A different image size, resolution, or panel layout for v3 might change the outcome.
+
+\subsection{Data Leakage in V3: Fixed But Not Retested on Original Results}
+
+The initial v3 dataset was generated with two bugs: a prediction horizon of 5 days instead of 20, and MinMax scaling applied across the full price history of each stock. Both bugs were corrected before running the image encoding comparison experiment. The corrected v3 results reported in Section~\ref{sec:res_h2} reflect the fixed pipeline. However, the main three-model results in Table~\ref{tab:main_metrics} were produced with the original EfficientNet-B2 and ConvNeXt V2 models, which were trained on the v4 dataset and are unaffected by the v3 bug. The v3 bug primarily affects the interpretation of the comparison experiment: the fixed v3 results represent a fair comparison, but the original (buggy) v3 model was not re-evaluated in the main analysis.
+
+\subsection{Single GPU and Training Variance}
+
+The two hybrid models are each trained once due to computational constraints. The Baseline CNN uses a 5-run ensemble to reduce variance, but EfficientNet-B2 and ConvNeXt V2 are single runs. Small differences in the random seed, the order of mini-batches, or the exact early stopping checkpoint can shift the AUC by a few thousandths. The reported AUC differences between the models, which are in the range of 0.001--0.005, could in part reflect this variance rather than a genuine architectural difference.
+
+\subsection{Cryptocurrency Transfer: Very Small Sample}
+
+The crypto transfer experiment uses only two assets: Bitcoin and Ethereum. While these are the two largest cryptocurrencies by market cap and are among the most traded financial assets in the world, two assets do not provide enough cross-sectional variation to draw strong conclusions. The strong ConvNeXt V2 result of AUC 0.5433 is encouraging, but it is based on a single model applied to two correlated assets over a period with a specific volatility regime. Replicating this experiment on a broader set of cryptocurrency assets would be needed to confirm the finding.
+
+\subsection{No Hyperparameter Tuning on OOS Data}
+
+All hyperparameters, including learning rates, batch sizes, focal loss parameters, and the iTransformer architecture, were set before evaluating on the test set and were not adjusted based on OOS performance. This is the correct procedure and ensures no test-set leakage. However, it also means that the hyperparameter choices may not be optimal for the specific characteristics of the test period. In particular, the asymmetric focal loss parameters ($\gamma^+ = 1.0$, $\gamma^- = 2.0$) and the selective freezing strategy for ConvNeXt were chosen based on general considerations rather than systematic search, and a grid search over these parameters on the validation set could potentially improve results.
