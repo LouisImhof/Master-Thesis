@@ -1,5 +1,16 @@
-\newpage
-\section{Abstract}
+% ============================================================
+% abstract_draft.tex
+% Copy contents into the abstract environment in main.tex
+% ============================================================
 
+\begin{abstract}
 
-\
+This thesis tests whether convolutional neural networks trained on stock price chart images can predict short-term return direction in the Euro Stoxx 50, and whether more advanced architectures and richer image encodings improve on the baseline approach of Jiang, Kelly, and Xiu (2023).
+
+Three models are evaluated over a strict walk-forward split with training data up to 2018, a validation period of 2019--2020, and an out-of-sample test period from 2021 to early 2026. The baseline model replicates the three-block VGG-style CNN from Jiang et al. using 60$\times$64 greyscale OHLC images. Two hybrid models pair pretrained visual backbones (EfficientNet-B2 and ConvNeXt V2-Tiny) with Transformer-based sequence encoders that process 21--25 technical indicators alongside the image.
+
+All three models achieve out-of-sample AUC above 0.5, with 95\% confidence intervals lying entirely above the no-skill baseline. The signal is small, with AUC values of 0.516--0.518, but consistent across models and confirmed by positive portfolio Sharpe Ratios. The advanced hybrid architectures do not significantly outperform the baseline CNN in terms of AUC, but a separate image encoding comparison shows that the multi-scale RGB format (v4), which encodes price information at three time horizons simultaneously, significantly outperforms the single-scale candlestick format (v3) for both architectures ($p < 0.01$). The choice of image encoding turns out to matter more than the choice of backbone architecture.
+
+When the Euro Stoxx 50-trained models are applied directly to Bitcoin and Ethereum without retraining, ConvNeXt V2 achieves an AUC of 0.5433, substantially above its equity market performance. This suggests that the visual features learned from equity chart data can transfer to a structurally different asset class.
+
+\end{abstract}

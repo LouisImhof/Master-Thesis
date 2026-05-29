@@ -72,6 +72,27 @@ The training set spans two full market cycles, including the Global Financial Cr
 
 Three different chart image formats are used across the models in this thesis. The baseline model uses the greyscale OHLC image of \textcite{Jiang2023}. The hybrid models are each evaluated on two formats: a multi-indicator candlestick chart (v3) and a multi-scale RGB image (v4). The comparison between v3 and v4 is described in Section~\ref{sec:imgexp}.
 
+\begin{figure}[h]
+  \centering
+  \begin{minipage}{0.3\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{Graphics/INGA_AS_20140912_baseline.png}
+    \caption*{Baseline}
+  \end{minipage}
+  \hfill
+  \begin{minipage}{0.3\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{Graphics/INGA_AS_20140912_v3.png}
+    \caption*{Version 3}
+  \end{minipage}
+  \hfill
+  \begin{minipage}{0.3\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{Graphics/INGA_AS_20140912_v4.png}
+    \caption*{Version 4}
+  \end{minipage}
+\end{figure}
+
 \subsubsection{Baseline Greyscale OHLC Image}
 
 Following \textcite{Jiang2023} precisely, each 20-day window is rendered as a $60 \times 64$ pixel greyscale image. The image encodes Open, High, Low, Close, Volume, and a 20-day moving average. The construction follows three steps.
@@ -146,6 +167,7 @@ In addition to the chart image, the hybrid models take a sequence of technical i
 \centering
 \caption{Technical Indicator Feature Set (v3: features 1--21; v4: all 25)}
 \label{tab:features}
+\small
 \begin{tabular}{lllc}
 \toprule
 \textbf{Feature} & \textbf{Category} & \textbf{Description} & \textbf{v3/v4} \\
@@ -155,7 +177,7 @@ Volume & Volume & Raw daily volume & both \\
 SMA5, SMA20 & Trend & 5-day and 20-day simple moving averages & both \\
 BB\_Upper, BB\_Lower & Volatility & Bollinger Bands ($\pm 2\sigma$, 20-day) & both \\
 BB\_Position & Volatility & Price position within the Bollinger Bands & both \\
-RSI & Momentum & 14-day Relative Strength Index \parencite{lo2000} & both \\
+RSI & Momentum & 14-day Relative Strength Index & both \\
 Williams\_R & Momentum & Williams \%R oscillator (14-day) & both \\
 MACD, MACD\_Signal & Trend & MACD(12,26,9) line and signal line & both \\
 MACD\_Hist & Trend & MACD histogram & both \\
@@ -246,8 +268,8 @@ Leaky ReLU with negative slope $\alpha = 0.01$ is used throughout:
 \label{eq:lrelu}
 \end{equation}
 
-\paragraph{Loss Function.}
-The model is trained with standard cross-entropy loss weighted by inverse class frequency to handle the mild class imbalance.
+\paragraph{Loss Function and Class Balancing.}
+The model is trained with standard unweighted cross-entropy loss. Class balance during training is achieved through a weighted random sampler that draws each mini-batch with equal expected counts for Up and Down examples, so the model never sees the majority class more often than the minority class within any batch. This avoids the numerical instability that arises from combining loss-level class weights with a large batch size on an imbalanced dataset.
 
 \paragraph{Ensemble.}
 The model is trained 5 times with different random seeds. The final prediction is the average of the 5 softmax outputs, following \textcite{Jiang2023}.
@@ -391,6 +413,7 @@ Automatic Mixed Precision (AMP) is used throughout, keeping forward pass computa
 \centering
 \caption{Training Configuration by Model}
 \label{tab:training_config}
+\resizebox{\linewidth}{!}{%
 \begin{tabular}{lccc}
 \toprule
 \textbf{Setting} & \textbf{Model I (Baseline)} & \textbf{Model II (EfficientNet)} & \textbf{Model III (ConvNeXt)} \\
@@ -399,17 +422,18 @@ Input image size        & $60 \times 64$      & $224 \times 224$      & $224 \ti
 Image channels          & 1 (greyscale)       & 3 (RGB)               & 3 (RGB)               \\
 Sequence features       & none                & 21 (v3) or 25 (v4)    & 21 (v3) or 25 (v4)    \\
 Batch size              & 512                 & 256                   & 128                   \\
-LR (head)               & $1 \times 10^{-5}$  & $3 \times 10^{-4}$    & $1 \times 10^{-4}$    \\
+LR (head)               & $1 \times 10^{-4}$  & $3 \times 10^{-4}$    & $1 \times 10^{-4}$    \\
 LR (backbone)           & --                  & $3 \times 10^{-5}$    & $1 \times 10^{-5}$    \\
 Weight decay            & $1 \times 10^{-4}$  & $1 \times 10^{-4}$    & $1 \times 10^{-4}$    \\
-Early stopping patience & 2                   & 7                     & 7                     \\
+Early stopping patience & 5                   & 7                     & 7                     \\
 Max epochs              & 50                  & 30                    & 30                    \\
 Augmentation            & none                & CutMix + Mixup        & none                  \\
 Loss function           & Cross-Entropy       & Focal Loss ($\gamma=2$) & Asym.\ Focal Loss   \\
 Ensemble runs           & 5                   & 1                     & 1                     \\
 Frozen stages           & n/a                 & none                  & Stages 0--2           \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 % ─────────────────────────────────────────────────────────────────────────────
@@ -472,7 +496,7 @@ Portfolio returns are approximated by using the binary label as a direction prox
 Performance is measured by the annualised Sharpe Ratio, Sortino Ratio, Maximum Drawdown, and Hit Rate.
 
 \paragraph{Temporal and Regime Analysis.}
-AUC is reported annually from 2021 to 2026 and as a rolling statistic over 500-observation windows. The test period is split into four regimes: post-pandemic bull market (2021), monetary tightening and bear market (2022), recovery (2023--2024), and recent period (2025). Regime-level AUC values test whether performance is stable across different market conditions.
+AUC is reported annually from 2021 to 2026 and as a rolling statistic over 1,000-observation windows. The test period is split into four regimes: post-pandemic bull market (2021), monetary tightening and bear market (2022), recovery (2023--2024), and recent period (2025). Regime-level AUC values test whether performance is stable across different market conditions.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \subsection{Image Encoding Comparison Experiment}
