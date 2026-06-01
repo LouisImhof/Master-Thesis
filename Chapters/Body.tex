@@ -64,7 +64,7 @@ where AUC is measured out-of-sample over the test period 2021 to 2026. Significa
 
 \subsubsection*{Hypothesis 2: Architectural Advances over the Baseline}
 
-The baseline model from \textcite{Jiang2023} is a three-block VGG-style CNN trained on single-scale grayscale images. Since that paper appeared, image recognition architectures have improved considerably. ConvNeXt V2 \parencite{liu2022convnext} and EfficientNet-B2 both benefit from pre-training on ImageNet-21k and from architectural improvements over standard VGG networks. In addition, Transformer-based sequence encoders \parencite{vaswani2017} allow the models in this thesis to process 25 quantitative technical indicators alongside the image, a capability the original baseline lacks entirely.
+The baseline model from \textcite{Jiang2023} is a three-block VGG-style CNN trained on single-scale greyscale images. Since that paper appeared, image recognition architectures have improved considerably. ConvNeXt V2 \parencite{liu2022convnext} and EfficientNet-B2 both benefit from pre-training on ImageNet-21k and from architectural improvements over standard VGG networks. In addition, Transformer-based sequence encoders \parencite{vaswani2017} allow the models in this thesis to process 25 quantitative technical indicators alongside the image, a capability the original baseline lacks entirely.
 
 The hypothesis is that these improvements translate into better out-of-sample performance:
 
@@ -77,7 +77,7 @@ The hypothesis is that these improvements translate into better out-of-sample pe
 
 Two advanced models are tested separately. The first pairs EfficientNet-B2 with a standard Transformer sequence encoder. The second pairs ConvNeXt V2-Tiny with an iTransformer encoder \parencite{liu2024itransformer}, which treats each technical indicator as a token rather than each time step, allowing attention to model cross-indicator relationships. Pairwise AUC differences are tested with the DeLong test \parencite{delong1988}, which is appropriate when two models are evaluated on the same observations.
 
-The rationale for expecting improvement is twofold. The multi-scale RGB image encoding used in the advanced models exposes the network to visual information at three time horizons simultaneously (5, 20, and 60 trading days), whereas the baseline sees only one. And the addition of a numerical indicator branch means the model can combine visual pattern recognition with precise quantitative signal.
+The rationale for expecting improvement is twofold. The multi-scale RGB image encoding used in the advanced models exposes the network to visual information at three time horizons simultaneously (5, 20, and 60 trading days), whereas the baseline sees only one. The addition of a numerical indicator branch means the model can combine visual pattern recognition with precise quantitative signal.
 
 \subsubsection*{Hypothesis 3: Geographical Generalisation}
 
