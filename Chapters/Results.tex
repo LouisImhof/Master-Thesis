@@ -222,47 +222,42 @@ The IC of 0.075 for ConvNeXt V2 on cryptocurrencies is more than twice its equit
 \label{sec:portfolio}
 % ─────────────────────────────────────────────────────────────────────────────
 
-Table~\ref{tab:portfolio} summarises portfolio performance across the four trading strategies for the three main models and for the v4 comparison models, which achieved the best classification performance.
+Table~\ref{tab:portfolio} reports the corrected portfolio results for the three main models using actual 20-day forward returns and non-overlapping rebalancing every 20 trading days, as described in Section~\ref{sec:evaluation}. The strategy is a cross-sectional quintile long-short: long the top quintile and short the bottom quintile by predicted up-probability, equal-weighted and dollar-neutral, with 10 basis points round-trip cost deducted.
 
 \begin{table}[H]
 \centering
-\caption{Portfolio Performance, Long-Short Strategy (Test Period 2021--2026)}
+\caption{Portfolio Performance, Quintile Long-Short Strategy (Test Period 2021--2026)}
 \label{tab:portfolio}
 \small
-\begin{tabular}{lccccr}
+\begin{tabular}{lccccccc}
 \toprule
-\textbf{Model} & \textbf{Sharpe} & \textbf{Sortino} & \textbf{Max DD} & \textbf{Hit Rate} & \textbf{N trades} \\
+\textbf{Model} & \textbf{Gross Ret.} & \textbf{Net Ret.} & \textbf{Sharpe (net)} & \textbf{Sortino (net)} & \textbf{Max DD} & \textbf{NW $t$} & \textbf{$p$} \\
 \midrule
-Baseline CNN      & 0.937 & 1.731 & $-$0.260 & 0.609 & 1,354 \\
-EfficientNet-v3   & 0.896 & 1.698 & $-$0.226 & 0.590 & 1,345 \\
-EfficientNet-v4   & 0.930 & 1.723 & $-$0.150 & 0.588 & 1,346 \\
-ConvNeXt-v3       & 0.808 & 1.431 & $-$0.168 & 0.582 & 1,345 \\
-ConvNeXt-v4       & \textbf{0.973} & \textbf{1.863} & $-$0.300 & 0.601 & 1,346 \\
+Baseline CNN    & $+$5.1\% & $+$3.9\% & 0.32 & 0.54 & $-$0.165 & 0.77 & 0.446 \\
+EfficientNet-B2 & $+$0.7\% & $-$0.6\% & $-$0.06 & $-$0.10 & $-$0.161 & $-$0.15 & 0.884 \\
+ConvNeXt V2     & $+$5.1\% & $+$3.8\% & 0.36 & 0.62 & $-$0.184 & 0.87 & 0.389 \\
+\midrule
+EW Benchmark    & $+$15.0\% & -- & 1.04 & -- & $-$0.188 & -- & -- \\
 \bottomrule
 \end{tabular}
+\smallskip\par
+{\small \textit{Note}: Returns are annualised. All models: $N = 65$ non-overlapping 20-day periods. Newey-West $t$-statistics use 1 lag. Gross/net returns are the annualised mean period return before and after 10 bps round-trip cost. The EW Benchmark is an equal-weighted buy-and-hold across all 50 constituents on the same rebalance dates.}
 \end{table}
 
-The Baseline CNN achieves a long-short Sharpe Ratio of 0.937, and ConvNeXt-v4 reaches 0.973. The two v3 models, EfficientNet-v3 and ConvNeXt-v3, show lower Sharpe Ratios of 0.896 and 0.808 respectively, consistent with their lower AUC values. EfficientNet-v4 has the lowest maximum drawdown at $-$0.150, meaning its directional errors were smaller in magnitude even though its Sharpe Ratio is lower than ConvNeXt-v4.
+Baseline CNN and ConvNeXt V2 both produce positive gross annualised returns of around 5\%, with net Sharpe Ratios of 0.32 and 0.36 respectively. EfficientNet-B2 generates a near-zero gross return that turns slightly negative after transaction costs. None of the three models achieves a statistically significant return at conventional levels: the Newey-West $t$-statistics range from $-$0.15 to 0.87, all with $p > 0.05$.
 
-The full portfolio results across all four strategies are shown in Figure~\ref{fig:cumulative_returns} (main models) and Figure~\ref{fig:comp_returns} (comparison models).
+The lack of statistical significance is not a surprise. With a 20-day holding period and a five-year test window, the backtest contains only 65 non-overlapping independent periods. To reach a $t$-statistic above 2.0 with $N = 65$, a net Sharpe Ratio above approximately 0.80 would be required. The signal in these models, while positive for two of the three architectures, is not large enough to reach conventional significance thresholds given the available test sample. This is a fundamental constraint of evaluating a 20-day-horizon strategy over a five-year window and applies regardless of which model is used.
+
+A further caveat concerns the comparison with \textcite{Jiang2023}, whose trading results on U.S. equities show substantially higher Sharpe Ratios. Two structural differences explain the gap. First, their universe contains several thousand stocks rather than 50, so each portfolio leg holds hundreds of positions per rebalance date; idiosyncratic noise diversifies almost entirely away and only the systematic directional signal contributes to returns. With 10 stocks per leg in this thesis, idiosyncratic noise dominates. Second, the 2021--2026 test period was a strong bull market: the equal-weighted benchmark itself achieved a Sharpe of 1.04, leaving little room for a long-short strategy to distinguish itself. AUC and IC, which are invariant to universe size and do not conflate cross-sectional signal with market direction, are the appropriate basis for comparing predictability across the two studies.
+
+The cumulative return curves for all three models and the equal-weighted benchmark are shown in Figure~\ref{fig:cumulative_returns}.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\textwidth]{Graphics/cumulative_returns.png}
-\caption{Cumulative returns from four trading strategies (long-short, long-only, quintile, probability-weighted) for the three main models over 2021--2026. All strategies show positive cumulative performance for the Baseline CNN and ConvNeXt V2.}
+\includegraphics[width=\textwidth]{Graphics/01_corrected_backtest.png}
+\caption{Left: Cumulative net returns of the quintile long-short strategy for the three main models and the equal-weighted buy-and-hold benchmark, rebalanced every 20 trading days (OOS 2021--2026, net of 10 bps round-trip). Right: Annualised net return per year. Baseline CNN and ConvNeXt V2 are positive on a gross basis; EfficientNet-B2 is near zero.}
 \label{fig:cumulative_returns}
 \end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=\textwidth]{Graphics/05_cumulative_returns.png}
-\caption{Cumulative returns from the long-short strategy for all five comparison models over 2021--2026. ConvNeXt-v4 and Baseline CNN accumulate the most gains; the v3 models lag behind.}
-\label{fig:comp_returns}
-\end{figure}
-
-The probability-weighted strategy consistently achieves the highest Sharpe Ratios across models. For the Baseline CNN it reaches 1.022, and for EfficientNet-v4 it reaches 1.074. This suggests that the continuous probability scores carry more information than the binary classification threshold, and that sizing positions in proportion to conviction adds value relative to a fixed-size long-short position.
-
-The quintile strategy, which trades only the top and bottom 20\% of predictions, performs poorly relative to the other strategies, with some negative Sharpe Ratios for the v3 models. This indicates that the most extreme predictions from the v3 models are not more accurate than the median predictions, possibly reflecting miscalibrated tail probabilities. The v4 models show positive quintile Sharpe Ratios, consistent with better tail calibration.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \subsection{Temporal Stability and Regime Analysis}

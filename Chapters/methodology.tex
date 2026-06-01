@@ -54,7 +54,7 @@ Table~\ref{tab:split} shows the resulting sample sizes.
 \toprule
 \textbf{Partition} & \textbf{Period} & \textbf{Observations} & \textbf{Share} \\
 \midrule
-Training   & 2000--2018 & 223,749 & 70.8\% \\
+Training   & 2005--2018 & 223,749 & 70.8\% \\
 Validation & 2019--2020 &  25,222 &  8.0\% \\
 OOS Test   & 2021--2026 &  66,932 & 21.2\% \\
 \midrule
@@ -71,27 +71,6 @@ The training set spans two full market cycles, including the Global Financial Cr
 % ─────────────────────────────────────────────────────────────────────────────
 
 Three different chart image formats are used across the models in this thesis. The baseline model uses the greyscale OHLC image of \textcite{Jiang2023}. The hybrid models are each evaluated on two formats: a multi-indicator candlestick chart (v3) and a multi-scale RGB image (v4). The comparison between v3 and v4 is described in Section~\ref{sec:imgexp}.
-
-\begin{figure}[h]
-  \centering
-  \begin{minipage}{0.3\textwidth}
-    \centering
-    \includegraphics[width=\textwidth]{Graphics/INGA_AS_20140912_baseline.png}
-    \caption*{Baseline}
-  \end{minipage}
-  \hfill
-  \begin{minipage}{0.3\textwidth}
-    \centering
-    \includegraphics[width=\textwidth]{Graphics/INGA_AS_20140912_v3.png}
-    \caption*{Version 3}
-  \end{minipage}
-  \hfill
-  \begin{minipage}{0.3\textwidth}
-    \centering
-    \includegraphics[width=\textwidth]{Graphics/INGA_AS_20140912_v4.png}
-    \caption*{Version 4}
-  \end{minipage}
-\end{figure}
 
 \subsubsection{Baseline Greyscale OHLC Image}
 
@@ -480,20 +459,39 @@ z = \frac{\hat{\theta}_A - \hat{\theta}_B}{\sqrt{\hat{S}_{AA} + \hat{S}_{BB} - 2
 
 where $\hat{S}_{AB}$ is the estimated covariance between the AUC estimators. Under the null $H_0: \text{AUC}_A = \text{AUC}_B$, the statistic $z$ is asymptotically standard normal. Tests are conducted at $\alpha \in \{0.05, 0.01, 0.001\}$.
 
-\subsubsection{Trading Strategies}
+\subsubsection{Trading Strategy and Portfolio Construction}
 
-Four strategies are constructed to evaluate economic performance. Let $\hat{p}_{i,t}$ be the predicted up-probability for stock $i$ at date $t$:
+Economic performance is evaluated using a cross-sectional quintile long-short strategy on actual realised returns. On each rebalance date $t$, all stocks are ranked by their predicted up-probability $\hat{p}_{i,t}$. The strategy goes long the top quintile and short the bottom quintile, equal-weighted and dollar-neutral:
 
-\begin{align}
-\delta^{LS}_{i,t}  &= \text{sign}\!\left(\hat{p}_{i,t} - 0.5\right) &&\text{Long-Short} \\
-\delta^{LO}_{i,t}  &= \mathbb{1}\!\left[\hat{p}_{i,t} > 0.5\right] &&\text{Long-Only} \\
-\delta^{Q}_{i,t}   &= \mathbb{1}\!\left[\hat{p}_{i,t} \geq Q_{0.8}\right] - \mathbb{1}\!\left[\hat{p}_{i,t} \leq Q_{0.2}\right] &&\text{Quintile} \\
-\delta^{PW}_{i,t}  &= 2\hat{p}_{i,t} - 1 &&\text{Prob.-Weighted}
-\end{align}
+\begin{equation}
+\delta^{Q}_{i,t} = \mathbb{1}\!\left[\hat{p}_{i,t} \geq Q_{0.8,t}\right] - \mathbb{1}\!\left[\hat{p}_{i,t} \leq Q_{0.2,t}\right]
+\label{eq:quintile}
+\end{equation}
 
-Portfolio returns are approximated by using the binary label as a direction proxy. A long (short) position in a stock that goes up (down) generates a unit gain; a long (short) position in a stock that goes down (up) generates a unit loss. Individual returns are capped at 1\% per period.
+where $Q_{0.8,t}$ and $Q_{0.2,t}$ are the 80th and 20th percentiles of predicted probabilities across all stocks on date $t$. With 50 stocks in the Euro Stoxx 50, each leg contains approximately 10 stocks per rebalance date.
 
-Performance is measured by the annualised Sharpe Ratio, Sortino Ratio, Maximum Drawdown, and Hit Rate.
+\paragraph{Return Computation.}
+The return contribution of each position is the actual 20-day forward return $r_{i,t} = P_{i,t+H}/P_{i,t} - 1$, where $H = 20$ trading days, consistent with the label definition in Equation~\eqref{eq:label}. Returns are winsorised at the 1st and 99th percentile of the OOS return distribution to limit the influence of extreme outliers without discarding their information entirely. The portfolio gross return per period is:
+
+\begin{equation}
+R^{gross}_t = \frac{1}{|L_t|}\sum_{i \in L_t} r_{i,t} - \frac{1}{|S_t|}\sum_{i \in S_t} r_{i,t}
+\label{eq:portret}
+\end{equation}
+
+where $L_t$ and $S_t$ denote the long and short legs respectively. Net returns subtract 10 basis points per rebalance to account for round-trip transaction costs, which is a conservative but reasonable estimate for Euro Stoxx 50 blue-chip stocks:
+
+\begin{equation}
+R^{net}_t = R^{gross}_t - 0.001
+\label{eq:netret}
+\end{equation}
+
+\paragraph{Non-Overlapping Rebalancing.}
+The portfolio is rebalanced every 20 trading days, producing non-overlapping holding periods. This matches the prediction horizon and eliminates autocorrelation in the return series caused by overlapping windows. The OOS test period of approximately 1,260 trading days yields $N = 65$ independent rebalance periods. Statistical significance is assessed via Newey-West $t$-statistics with one lag, and the no-skill null ($\mu = 0$) is tested against the alternative that the mean net return is positive.
+
+\paragraph{Benchmark.}
+The equal-weighted buy-and-hold portfolio across all 50 Euro Stoxx 50 constituents is used as a passive benchmark. Its 20-day return on each rebalance date provides a reference for whether the long-short spread contains information beyond the overall market direction.
+
+Performance is summarised by the annualised Sharpe Ratio, Sortino Ratio, Maximum Drawdown, Hit Rate, and Newey-West $t$-statistic.
 
 \paragraph{Temporal and Regime Analysis.}
 AUC is reported annually from 2021 to 2026 and as a rolling statistic over 1,000-observation windows. The test period is split into four regimes: post-pandemic bull market (2021), monetary tightening and bear market (2022), recovery (2023--2024), and recent period (2025). Regime-level AUC values test whether performance is stable across different market conditions.
