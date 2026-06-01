@@ -11,6 +11,16 @@ The empirical analysis covers 50 stocks. While the Euro Stoxx 50 provides a clea
 
 The 50-stock universe also means the model cannot learn from a diverse range of company types, market caps, or liquidity conditions during training. All stocks in the index are blue-chip and highly liquid. Whether the results generalise to smaller or less liquid European stocks is an open question.
 
+A further concern specific to the universe construction is survivorship bias. If the sample is built from the constituents of the Euro Stoxx~50 as of the end of the sample period, with their
+prices backfilled, then firms that were delisted, acquired, or dropped from the
+index over 2000--2026 are excluded by construction, and the surviving large-cap
+firms that remain are precisely those that performed well enough to retain index
+membership. This would bias the upward drift of the sample and could inflate the
+apparent predictability of ``up'' labels. If instead point-in-time membership is
+used, this concern is largely mitigated and the design should say so explicitly.
+Either way, the direction of any survivorship effect should be acknowledged, as
+it is a standard concern in long-horizon equity studies.
+
 \subsection{Transaction Costs and Implementation}
 
 The portfolio analysis abstracts from transaction costs, bid-ask spreads, market impact, and short-selling constraints. For a 20-day horizon strategy trading blue-chip Euro Stoxx 50 stocks, transaction costs are likely manageable relative to the simulated returns, but they are not zero. The quantile strategy in particular takes smaller and more concentrated positions that would incur higher percentage costs if implemented.
