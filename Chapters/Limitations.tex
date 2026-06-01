@@ -7,9 +7,11 @@
 
 \subsection{Sample Size and Universe}
 
-The empirical analysis covers 50 stocks. While the Euro Stoxx 50 provides a clean and liquid sample with a long history, it is a small cross-section compared to most academic return prediction studies. \textcite{Gu2020} work with several thousand U.S. stocks, and \textcite{Jiang2023} use all liquid NYSE and NASDAQ stocks over nearly three decades. With 50 stocks and a 20-day prediction horizon, there are only around 250 non-overlapping cross-sections per year in the test set. This limits statistical power for detecting small effects and makes the results sensitive to the behaviour of individual large-cap stocks.
+The empirical analysis covers 50 stocks. While the Euro Stoxx 50 provides a clean and liquid sample with a long history, it is a small cross-section compared to most academic return prediction studies. \textcite{Gu2020} work with several thousand U.S. stocks, and \textcite{Jiang2023} use all liquid NYSE and NASDAQ stocks over nearly three decades. With 50 stocks and a 20-day prediction horizon, there are only around 12--13 non-overlapping rebalancing periods per year, each covering a cross-section of at most 50 stocks. This limits statistical power for detecting small effects and makes the results sensitive to the behaviour of individual large-cap stocks.
 
-The 50-stock universe also means the model cannot learn from a diverse range of company types, market caps, or liquidity conditions during training. All stocks in the index are blue-chip and highly liquid. Whether the results generalise to smaller or less liquid European stocks is an open question.
+The 50-stock universe also means the model trains on a narrow slice of the market. All index constituents are large-cap and highly liquid, so the results may not extend to smaller or less liquid European stocks.
+
+A further concern is survivorship bias. The ticker list was fixed based on index membership at the time of data collection. Firms that were removed from the Euro Stoxx 50 between 2000 and 2026 through delisting, acquisition, or index relegation are not included in the sample. Since surviving firms are precisely those that remained large and liquid enough to retain membership, the upward drift of the sample may be overstated and the frequency of positive return labels may be slightly inflated relative to what a live investor would have faced.
 
 \subsection{Transaction Costs and Implementation}
 

@@ -6,7 +6,7 @@
 \newpage
 \section{Introduction}
 
-Market practitioners have been reading price charts for over a century. The visual patterns that technical analysts study, head-and-shoulders formations, support and resistance levels, momentum breakouts, are still widely used in equity trading despite decades of academic scepticism. The question this thesis asks is simple: can a neural network learn to read those charts, and if it can, does the signal it finds in European equities tell us anything useful?
+Market practitioners have been reading price charts for over a century. The visual patterns that technical analysts study, including head-and-shoulders formations, support and resistance levels, and momentum breakouts, are still widely used in equity trading despite decades of academic scepticism. The question this thesis asks is simple: can a neural network learn to read those charts, and if it can, does the signal it finds in European equities tell us anything useful?
 
 The starting point is the work of Jiang, Kelly, and Xiu (2023), who convert daily OHLCV data into standardised greyscale images and train convolutional neural networks to predict the direction of 20-day returns. Applied to U.S. stocks from 1993 to 2020, their models produce AUC values in the 0.54--0.56 range and Sharpe Ratios that exceed those of standard momentum strategies. The core insight is that translating financial data into images allows a CNN to discover non-linear patterns across multiple price features simultaneously, something that a hand-crafted factor model cannot do.
 
