@@ -63,12 +63,14 @@ The Brier Scores cluster around 0.25, close to the Brier Score of an uninformati
 
 From Table~\ref{tab:main_metrics}, ConvNeXt V2 achieves the highest AUC at 0.5179, followed by the Baseline CNN at 0.5166 and EfficientNet-B2 at 0.5160. The gap between the best model and the baseline is only 0.001 AUC points. As noted later in this section, single-run training variance from random seed differences and early stopping timing amounts to around 0.004--0.005 AUC points, which exceeds the entire spread across the three models. The ranking in Table~\ref{tab:main_metrics} should therefore not be interpreted as a stable ordering of architectures.
 
-The confusion matrices in Figure~\ref{fig:confusion_matrices} reveal an important qualitative difference between the models. The Baseline CNN and ConvNeXt V2 show a bias toward predicting Up, which is consistent with the positive class frequency of 55\% in the data. EfficientNet-B2, by contrast, produces a more balanced distribution of predictions. The EfficientNet model with Focal Loss and label smoothing was calibrated specifically to avoid the over-prediction of the majority class.
+The confusion matrices in Figure~\ref{fig:confusion_matrices} show that all three models classify the large majority of observations as Up. This is expected rather than a defect. The positive class frequency in the test set is 55\%, and when a model carries only a weak signal its predicted probabilities concentrate near this base rate, which lies above the 0.5 decision threshold; as a result almost every observation is assigned to the majority class. The Up bias is in fact strongest for EfficientNet-B2, which classifies roughly 90\% of observations as Up, closely followed by the Baseline CNN at around 89\%. ConvNeXt V2 is the least Up-biased of the three: it assigns about 80\% of observations to Up and therefore produces the most Down predictions.
+
+This threshold behaviour explains why the accuracy figures in Table~\ref{tab:main_metrics} cluster around 0.55, essentially the score of a naive ``always Up'' classifier, and why the macro F1 scores are modest. The bias does not, however, affect the conclusions of this thesis. AUC and IC are threshold-free rank statistics, and the quintile long-short portfolio in Section~\ref{sec:portfolio} ranks stocks by their predicted probability rather than thresholding at 0.5. The absolute level of the probabilities is therefore irrelevant to the headline results; only their cross-sectional ordering matters, which is precisely why AUC and IC, rather than accuracy, are the primary metrics in this analysis.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{Graphics/confusion_matrices.png}
-\caption{Confusion matrices for the three main models. Baseline CNN and ConvNeXt V2 tend to predict Up more often, while EfficientNet-B2 is more balanced.}
+\caption{Confusion matrices for the three main models. All three classify most observations as Up; the bias is strongest for EfficientNet-B2 ($\approx$90\%) and the Baseline CNN ($\approx$89\%), and weakest for ConvNeXt V2 ($\approx$80\%), which produces the most Down predictions.}
 \label{fig:confusion_matrices}
 \end{figure}
 
@@ -77,7 +79,7 @@ The prediction score distributions are shown in Figure~\ref{fig:pred_distributio
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\textwidth]{Graphics/pred_distribution.png}
-\caption{Distribution of predicted up-probabilities for each model. The Baseline CNN concentrates predictions above 0.5, EfficientNet-B2 spreads them more evenly, and ConvNeXt V2 shows a bimodal distribution with mass at both ends.}
+\caption{Distribution of predicted up-probabilities for each model. The Baseline CNN concentrates its predictions well above 0.5 (centred near 0.6), EfficientNet-B2 shows the widest spread but remains centred just above 0.5, and ConvNeXt V2 produces a tight, unimodal distribution centred just above 0.5. In all three cases the bulk of the mass lies above the 0.5 threshold, consistent with the Up bias in the confusion matrices.}
 \label{fig:pred_distribution}
 \end{figure}
 
@@ -319,7 +321,7 @@ Figure~\ref{fig:rolling_auc} shows rolling 1,000-observation AUC for all five mo
 \begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{Graphics/08_rolling_auc.png}
-\caption{Rolling AUC (1,000-observation window) for all five comparison models over the out-of-sample test period. All models fluctuate around 0.50--0.52, with occasional dips below 0.5 and peaks above 0.53.}
+\caption{Rolling AUC (1,000-observation window) for all five comparison models over the out-of-sample test period. The rolling AUC swings widely, from roughly 0.35 to 0.75, and crosses below 0.5 frequently, with no model sustaining an advantage for long. This high short-run variability is consistent with the small per-window cross-section and the low unconditional signal.}
 \label{fig:rolling_auc}
 \end{figure}
 
