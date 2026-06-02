@@ -30,7 +30,9 @@ ConvNeXt V2    & 0.5179 & [0.513, 0.522] & 0.546 & 0.477 & 0.031 \\
 \end{tabular}
 \end{table}
 
-All three models achieve AUC above 0.5, with 95\% confidence intervals that lie entirely above 0.5. This provides clear evidence against the null hypothesis $H_{10}$ that no model has any predictive power in European equities. The result holds even for the simplest model, the Baseline CNN, which was designed to replicate an existing published architecture.
+All three models achieve AUC above 0.5, with 95\% confidence intervals that lie entirely above 0.5. This provides evidence against the null hypothesis $H_{10}$ that no model has any predictive power in European equities. The result holds even for the simplest model, the Baseline CNN, which was designed to replicate an existing published architecture.
+
+One caveat applies to the confidence intervals. The bootstrap resamples individual stock-day observations, but adjacent days in the test set share up to 19 of their 20 input days, and the 50 names move substantially together cross-sectionally. The effective number of independent observations is therefore considerably smaller than the raw count of 66,932, and the reported intervals are likely narrower than a block or date-clustered bootstrap would produce. The point estimates consistently exceed 0.5 across all three models, which is the primary evidence for H1; the confidence intervals should be read as approximations of the uncertainty rather than precise frequentist coverage statements.
 
 The predictive signal is modest. AUC values in the range 0.51--0.52 represent a small but real ability to rank stocks by their likely direction over the next 20 trading days, consistent with the level of signal typically found in academic return prediction studies \parencite{Gu2020}. They do not imply that the models can reliably classify any individual stock as up or down.
 
@@ -59,7 +61,7 @@ The Brier Scores cluster around 0.25, close to the Brier Score of an uninformati
 
 \subsubsection{Main Architecture Comparison}
 
-From Table~\ref{tab:main_metrics}, ConvNeXt V2 achieves the highest AUC at 0.5179, followed by the Baseline CNN at 0.5166 and EfficientNet-B2 at 0.5160. The gap between the best model and the baseline is only 0.001 AUC points.
+From Table~\ref{tab:main_metrics}, ConvNeXt V2 achieves the highest AUC at 0.5179, followed by the Baseline CNN at 0.5166 and EfficientNet-B2 at 0.5160. The gap between the best model and the baseline is only 0.001 AUC points. As noted later in this section, single-run training variance from random seed differences and early stopping timing amounts to around 0.004--0.005 AUC points, which exceeds the entire spread across the three models. The ranking in Table~\ref{tab:main_metrics} should therefore not be interpreted as a stable ordering of architectures.
 
 The confusion matrices in Figure~\ref{fig:confusion_matrices} reveal an important qualitative difference between the models. The Baseline CNN and ConvNeXt V2 show a bias toward predicting Up, which is consistent with the positive class frequency of 55\% in the data. EfficientNet-B2, by contrast, produces a more balanced distribution of predictions. The EfficientNet model with Focal Loss and label smoothing was calibrated specifically to avoid the over-prediction of the majority class.
 
@@ -138,7 +140,9 @@ The v4 advantage is statistically significant for both architectures at $p < 0.0
 \label{fig:roc_panels}
 \end{figure}
 
-The architecture comparisons (EfficientNet vs ConvNeXt within each image type) are not significant, with $p = 0.095$ for the v3 image and $p = 0.762$ for the v4 image. This means that once the image format is fixed, both architectures perform at a similar level. The choice of image encoding matters more than the choice of backbone.
+The architecture comparisons (EfficientNet vs ConvNeXt within each image type) are not significant, with $p = 0.095$ for the v3 image and $p = 0.762$ for the v4 image. Once the image format is fixed, both architectures perform at a similar level. The v4 configuration outperforms v3 more reliably than any architectural choice does.
+
+One limitation of this comparison should be noted. The v3 and v4 configurations differ not only in image format but also in the number of technical indicators fed to the sequence encoder: 21 for v3 and 25 for v4. The performance advantage of v4 could therefore partly reflect the four additional indicators rather than the multi-scale image structure alone. A fully controlled ablation, holding the indicator set fixed while varying only the image format, would be needed to cleanly attribute the improvement to the encoding choice. This is left for future work. The conclusion is that the v4 \emph{configuration} outperforms v3, with the image format as the most likely primary driver, but the confound cannot be fully ruled out from the current experiment.
 
 Figure~\ref{fig:v4_delta} shows the year-by-year AUC advantage of v4 over v3 for each architecture.
 
@@ -215,7 +219,7 @@ The crypto cumulative return curves are shown in Figure~\ref{fig:crypto_returns}
 \label{fig:crypto_returns}
 \end{figure}
 
-The IC of 0.075 for ConvNeXt V2 on cryptocurrencies is more than twice its equity market IC of 0.031, providing further evidence that the model's cross-sectional rankings align more strongly with actual outcomes in the crypto setting. Whether this reflects a genuine transferable signal or an artefact of the specific test period is not fully clear, and the small sample of only two assets limits the reliability of this finding.
+With only two assets, a cross-sectional IC per date reduces to a directional hit-rate rather than a meaningful rank correlation, so the IC figures in Table~\ref{tab:crypto_metrics} should be interpreted as directional accuracy measures rather than cross-sectional signal estimates. ConvNeXt V2's higher IC reflects the model predicting the correct relative direction of BTC versus ETH more often than not, though this interpretation is limited by the two-asset constraint. Whether this reflects a genuine transferable signal or an artefact of the specific test period is not fully clear, and the small sample limits the reliability of the finding.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \subsection{Portfolio Performance}
