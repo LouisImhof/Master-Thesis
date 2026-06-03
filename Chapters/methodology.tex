@@ -383,7 +383,7 @@ with $\beta_1 = 0.9$, $\beta_2 = 0.999$, $\varepsilon = 10^{-8}$, and weight dec
 A \texttt{ReduceLROnPlateau} scheduler monitors validation AUC and halves all learning rates when no improvement is seen for 4 consecutive epochs, with a minimum floor of $10^{-6}$.
 
 \paragraph{Early Stopping.}
-Training stops when validation AUC fails to improve for 7 consecutive epochs (2 epochs for the baseline). The checkpoint with the highest validation AUC is saved and used for evaluation.
+Training stops when validation AUC fails to improve for 7 consecutive epochs (5 epochs for the baseline). The checkpoint with the highest validation AUC is saved and used for evaluation.
 
 \paragraph{Mixed Precision Training.}
 Automatic Mixed Precision (AMP) is used throughout, keeping forward pass computations in FP16 and accumulating gradients in FP32.
