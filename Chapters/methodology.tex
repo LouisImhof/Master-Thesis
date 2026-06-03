@@ -112,7 +112,7 @@ The v3 image is a $224 \times 224$ pixel RGB chart rendered on a dark background
     \item \textbf{ATR panel}: 14-day Average True Range as a line, indicating the volatility regime over the window.
 \end{enumerate}
 
-All panels share a common time axis. The resulting 224-pixel width gives approximately 11 pixels per trading day, which provides enough resolution for the candlestick bodies and wicks to be clearly distinguishable. By packing both price structure and momentum indicators into a single image, the v3 format gives the visual branch a richer representation than the basic OHLC chart, at the cost of a more complex visual structure.
+All panels share a common time axis. The resulting 224-pixel width gives approximately 11 pixels per trading day, which provides enough resolution for the candlestick bodies and wicks to be clearly distinguishable. By packing both price structure and momentum indicators into one image, the v3 format gives the image branch more to work with than a plain OHLC chart, at the cost of a busier picture.
 
 \paragraph{Data Leakage Fix.}
 The initial version of the v3 dataset was generated with two bugs: the prediction horizon was set to 5 days instead of 20, and price features were normalised using a MinMax scaler fitted across the entire stock history, which leaks information from future observations into the training data. Both bugs were identified and corrected before running the comparison experiment. The fixed pipeline uses $H = 20$ throughout and applies per-window z-score normalisation to all numerical features, consistent with the v4 pipeline.
