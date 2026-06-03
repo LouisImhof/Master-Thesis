@@ -326,3 +326,64 @@ Figure~\ref{fig:rolling_auc} shows rolling 1,000-observation AUC for all five mo
 \end{figure}
 
 The rolling AUC confirms that performance is not stable over time. There are extended periods where all models simultaneously perform well or poorly, suggesting that the predictability of the Euro Stoxx 50 varies with broader market conditions rather than being a stable property of any individual model. The co-movement of all model AUCs points to a common factor driving predictability, likely related to the market regime.
+
+\subsection{Robustness: The Full STOXX Europe 600 Universe}
+\label{sec:res_stoxx600}
+
+The main analysis uses the 50 constituents of the Euro Stoxx 50. To test
+whether the central findings depend on this small, large-cap sample, the H1
+and H2 classification comparison was repeated on the full STOXX Europe 600
+universe, a roughly twelve-fold larger and considerably more heterogeneous
+cross-section spanning seventeen European exchanges and the full
+market-capitalisation range. Constituents were taken from the iShares STOXX
+Europe 600 holdings list; 593 of the 600 names had sufficient Yahoo Finance
+history over the 2000--2026 period to be included. The walk-forward split
+(training $\leq$ 2018, validation 2019--2020, out-of-sample 2021--2026) and
+the 20-day prediction horizon are identical to the main analysis.
+
+Two implementation choices keep the larger run tractable on a single GPU:
+samples are drawn every fifth trading day rather than daily, and the
+multi-scale image is rendered at $112 \times 112$ rather than
+$224 \times 224$ pixels. These reduce the dataset to 658{,}383 samples and
+shorten training, at a small cost in absolute AUC; crucially, they do not
+affect the \emph{comparison} between models, which are trained and evaluated
+on the identical samples. The baseline is again a five-seed CNN ensemble and
+the advanced model is the ConvNeXt V2 plus iTransformer hybrid.
+
+Table~\ref{tab:stoxx600} reports the out-of-sample results, and they
+replicate the main findings. Both models achieve AUC above 0.5 with 95\%
+confidence intervals that exclude 0.5, confirming that the predictive signal
+documented under H1 is present across the broad European market and is not an
+artefact of the large-cap Euro Stoxx 50 sample. The advanced model does not
+outperform the baseline: the AUC difference of 0.002 is statistically
+insignificant (DeLong $z = -1.08$, $p = 0.28$), exactly as found for H2 in
+the main analysis. The Information Coefficients (0.024 and 0.021) are small
+and positive, in the same range as the 50-stock results.
+
+\begin{table}[H]
+\centering
+\caption{Out-of-Sample Comparison on the Full STOXX Europe 600 Universe
+(593 Stocks, Test Period 2021--2026)}
+\label{tab:stoxx600}
+\small
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Model} & \textbf{AUC} & \textbf{95\% CI} & \textbf{IC} & \textbf{OOS Samples} \\
+\midrule
+Baseline CNN (5-seed ensemble)   & 0.5142 & [0.511, 0.517] & 0.024 & 154{,}483 \\
+ConvNeXt V2 + iTransformer        & 0.5121 & [0.509, 0.515] & 0.021 & 154{,}483 \\
+\midrule
+\multicolumn{5}{l}{\textit{DeLong (Advanced vs.\ Baseline): $z = -1.08$,
+$p = 0.28$, not significant.}} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This extension reinforces the thesis's two central conclusions. The small but
+real chart-pattern signal (H1), and the absence of any architectural
+advantage of the advanced hybrid over the simple baseline (H2), both hold on
+a cross-section twelve times larger and far more diverse than the Euro Stoxx
+50. The consistency across the two universes indicates that these results
+reflect a structural property of European equity return prediction rather
+than the specific composition of the headline sample.
+As in the main analysis, the predicted probabilities cluster just above the class base rate; evaluated at a base-rate-matched decision threshold the two models classify roughly 55\% of observations as Up and reach a balanced accuracy of about 0.51, consistent with the modest AUC.
