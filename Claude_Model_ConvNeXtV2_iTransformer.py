@@ -1,4 +1,4 @@
-"""
+model_convnextv2_itransformer.py"""
 Phase 2 — HybridModelV5 Training  (Windows + RTX 2070)
 ========================================================
 Gleiche Datenbasis wie V3/V4:
